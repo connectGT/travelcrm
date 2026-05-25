@@ -23,7 +23,8 @@ export default function RootLayout({
               </svg>
             </div>
             <div className="nav-links">
-              <a href="#" className="active">Trips</a>
+              <a href="/">Dashboard</a>
+              <a href="/trips" className="active">Trips</a>
               <a href="#">Bookings</a>
               <a href="#">Accounting</a>
             </div>

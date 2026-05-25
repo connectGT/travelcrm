@@ -38,7 +38,11 @@ class QuoteVariantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuoteVariant
-        fields = ['id', 'quote', 'name', 'markup_percentage', 'gst_percentage', 'hotels', 'transports']
+        fields = [
+            'id', 'quote', 'name', 'markup_percentage', 'gst_percentage', 
+            'hotels', 'transports', 'total_net_price', 'markup_amount', 
+            'price_before_tax', 'gst_amount', 'selling_price'
+        ]
 
 class QuoteSerializer(serializers.ModelSerializer):
     variants = QuoteVariantSerializer(many=True, read_only=True)

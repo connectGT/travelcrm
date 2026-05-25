@@ -79,6 +79,28 @@ class QuoteVariant(models.Model):
     def __str__(self):
         return f"{self.quote.title} - {self.name}"
 
+    @property
+    def total_net_price(self):
+        hotels_total = sum(item.net_price for item in self.hotels.all())
+        transports_total = sum(item.net_price for item in self.transports.all())
+        return hotels_total + transports_total
+
+    @property
+    def markup_amount(self):
+        return self.total_net_price * (self.markup_percentage / 100)
+
+    @property
+    def price_before_tax(self):
+        return self.total_net_price + self.markup_amount
+
+    @property
+    def gst_amount(self):
+        return self.price_before_tax * (self.gst_percentage / 100)
+
+    @property
+    def selling_price(self):
+        return self.price_before_tax + self.gst_amount
+
 class HotelItem(models.Model):
     variant = models.ForeignKey(QuoteVariant, related_name='hotels', on_delete=models.CASCADE)
     hotel_name = models.CharField(max_length=255)
