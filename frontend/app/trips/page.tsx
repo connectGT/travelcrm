@@ -3,8 +3,19 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getTrips } from '../../lib/api';
 
+type Agent = { first_name?: string; last_name?: string };
+type Trip = {
+  id: number;
+  primary_contact_name: string;
+  destination?: string;
+  start_date?: string;
+  end_date?: string;
+  status: string;
+  assigned_agent_details?: Agent;
+};
+
 export default function TripsKanban() {
-  const [trips, setTrips] = useState<any[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,14 +31,14 @@ export default function TripsKanban() {
   }, []);
 
   // For visual testing when DB is empty, use dummy data if real data is empty
-  const displayTrips = trips.length > 0 ? trips : [
+  const displayTrips: Trip[] = trips.length > 0 ? trips : [
     { id: 1, primary_contact_name: 'John Doe', destination: 'Kashmir', start_date: '2024-05-12', end_date: '2024-05-18', status: 'NEW', assigned_agent_details: { first_name: 'Amit', last_name: 'K' } },
     { id: 2, primary_contact_name: 'Sarah Smith', destination: 'Bali', start_date: '2024-09-01', end_date: '2024-09-10', status: 'NEW', assigned_agent_details: { first_name: 'Jane', last_name: 'D' } },
     { id: 3, primary_contact_name: 'Tech Corp', destination: 'Goa', start_date: '2024-10-05', end_date: '2024-10-08', status: 'IN_PROGRESS', assigned_agent_details: { first_name: 'Amit', last_name: 'K' } },
     { id: 4, primary_contact_name: 'Michael Chang', destination: 'Swiss Alps', start_date: '2024-12-12', end_date: '2024-12-20', status: 'CONVERTED', assigned_agent_details: { first_name: 'Jane', last_name: 'D' } },
   ];
 
-  const getInitials = (agent: any) => {
+  const getInitials = (agent?: Agent) => {
     if (!agent) return 'U';
     return `${agent.first_name?.[0] || ''}${agent.last_name?.[0] || ''}`.toUpperCase();
   };

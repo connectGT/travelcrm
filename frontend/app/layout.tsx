@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -23,21 +24,21 @@ export default function RootLayout({
               </svg>
             </div>
             <div className="nav-links">
-              <a href="/">Dashboard</a>
-              <a href="/trips" className="active">Trips</a>
-              <a href="#">Bookings</a>
-              <a href="#">Accounting</a>
+              <Link href="/">Dashboard</Link>
+              <Link href="/trips" className="active">Trips</Link>
+              <Link href="#">Bookings</Link>
+              <Link href="#">Accounting</Link>
             </div>
             <input type="text" className="nav-search" placeholder="Search for trips..." />
           </div>
           <div className="nav-right">
             <div className="nav-links">
-              <a href="#">Services</a>
-              <a href="#">Suppliers</a>
+              <Link href="#">Services</Link>
+              <Link href="#">Suppliers</Link>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <span style={{ cursor: 'pointer' }}>🔔</span>
-              <button className="btn-whats-new">What's New</button>
+              <button className="btn-whats-new">What&apos;s New</button>
               <span style={{ cursor: 'pointer' }}>🏠</span>
               <span style={{ cursor: 'pointer' }}>👤</span>
             </div>
