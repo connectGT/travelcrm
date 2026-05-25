@@ -1,0 +1,1 @@
+web: cd backend && gunicorn travel_crm.wsgi --bind 0.0.0.0:$PORT
