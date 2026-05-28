@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.contrib.auth.models import User
-from crm.models import Tag, RawLead, Trip, FollowUp
+from crm.models import Tag, RawLead, Trip, FollowUp, Quote, QuoteVariant, ItineraryDay, HotelItem, TransportItem
 
 class Command(BaseCommand):
     help = 'Seeds the database with dummy CRM data'
@@ -134,5 +134,58 @@ class Command(BaseCommand):
                     followups_count += 1
                     
         self.stdout.write(f"Created {followups_count} FollowUps.")
+
+        # 5. Quotes & Itineraries
+        Quote.objects.all().delete()
+        for trip in trips_created:
+            quote = Quote.objects.create(
+                trip=trip,
+                title=f"Standard Package - {trip.destination}",
+                adults=trip.no_of_adults,
+                children=trip.no_of_children,
+                is_primary=True
+            )
+            
+            for d in range(1, trip.no_of_nights + 2):
+                if d == 1:
+                    activity = f"{trip.destination} - Arrival & Check-in"
+                elif d == trip.no_of_nights + 1:
+                    activity = f"{trip.destination} - Shopping & Departure"
+                else:
+                    activity = f"{trip.destination} - Local Sightseeing Day {d-1}"
+                    
+                ItineraryDay.objects.create(
+                    quote=quote,
+                    day_number=d,
+                    location=trip.destination,
+                    activity=activity
+                )
+                
+            variant = QuoteVariant.objects.create(
+                quote=quote,
+                name="3-Star Option",
+                markup_percentage=15.0,
+                gst_percentage=5.0
+            )
+            
+            HotelItem.objects.create(
+                variant=variant,
+                hotel_name=f"Premium Resort {trip.destination}",
+                check_in=trip.start_date,
+                check_out=trip.end_date,
+                room_type="Deluxe Room",
+                rooms_count=1,
+                net_price=12000.00
+            )
+            
+            TransportItem.objects.create(
+                variant=variant,
+                transport_type='CAB',
+                description=f"Sedan for {trip.no_of_nights} nights in {trip.destination}",
+                date=trip.start_date,
+                net_price=8000.00
+            )
+
+        self.stdout.write(f"Created Quotes and Itineraries.")
 
         self.stdout.write(self.style.SUCCESS('Successfully seeded database with realistic dummy data!'))

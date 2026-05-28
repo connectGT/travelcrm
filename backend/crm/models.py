@@ -98,6 +98,18 @@ class FollowUp(models.Model):
     def __str__(self):
         return f"Follow up for {self.trip} on {self.due_date}"
 
+class ItineraryDay(models.Model):
+    quote = models.ForeignKey('Quote', on_delete=models.CASCADE, related_name='itinerary_days')
+    day_number = models.PositiveIntegerField()
+    location = models.CharField(max_length=255)
+    activity = models.CharField(max_length=500)
+    
+    class Meta:
+        ordering = ['day_number']
+
+    def __str__(self):
+        return f"Day {self.day_number}: {self.location}"
+
 class Quote(models.Model):
     trip = models.ForeignKey(Trip, related_name='quotes', on_delete=models.CASCADE)
     title = models.CharField(max_length=255)

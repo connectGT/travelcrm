@@ -16,6 +16,9 @@ export const getTrips = (params?: TripSearchParams) => api.get('trips/', { param
 export const getTripById = (id: string) => api.get(`trips/${id}/`);
 export const getQuotes = () => api.get('quotes/');
 export const getQuoteVariants = () => api.get('quote-variants/');
+export const getSuggestedQuotes = (tripId: number) => api.get(`trips/${tripId}/suggested-quotes/`);
+export const cloneQuote = (tripId: number, quoteId: number) => api.post(`trips/${tripId}/clone-quote/${quoteId}/`);
+
 
 // Tags API
 export const getTags = () => api.get('tags/');

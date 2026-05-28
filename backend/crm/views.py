@@ -6,11 +6,12 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from io import BytesIO
 
-from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag
+from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag, ItineraryDay
 from .serializers import (
     RawLeadSerializer, TripSerializer, ContactSerializer,
     FollowUpSerializer, QuoteSerializer, QuoteVariantSerializer,
-    HotelItemSerializer, TransportItemSerializer, TagSerializer
+    HotelItemSerializer, TransportItemSerializer, TagSerializer,
+    ItineraryDaySerializer
 )
 
 class TagViewSet(viewsets.ModelViewSet):
@@ -130,6 +131,93 @@ class TripViewSet(viewsets.ModelViewSet):
         trip.save()
         return Response(self.get_serializer(trip).data)
 
+    @action(detail=True, methods=['get'])
+    def suggested_quotes(self, request, pk=None):
+        trip = self.get_object()
+        destination = trip.destination or ''
+        nights = trip.no_of_nights or 0
+        
+        from django.db.models import Q, Case, When, IntegerField
+        
+        matching_trips = Trip.objects.exclude(id=trip.id).filter(
+            Q(destination__iexact=destination) | Q(destination__icontains=destination.split()[0] if destination else ''),
+            no_of_nights__gte=max(0, nights - 1),
+            no_of_nights__lte=nights + 1,
+        ).annotate(
+            exact_match=Case(
+                When(destination__iexact=destination, then=0),
+                default=1,
+                output_field=IntegerField()
+            )
+        ).order_by('exact_match', '-created_at').prefetch_related('quotes__itinerary_days', 'quotes__variants__hotels', 'quotes__variants__transports')[:5]
+        
+        result = []
+        for t in matching_trips:
+            quotes = t.quotes.all()
+            if quotes.exists():
+                result.append({
+                    'trip_id': t.id,
+                    'client_name': t.primary_contact_name,
+                    'destination': t.destination,
+                    'no_of_nights': t.no_of_nights,
+                    'no_of_adults': t.no_of_adults,
+                    'quotes': QuoteSerializer(quotes, many=True).data
+                })
+        
+        return Response(result)
+
+    @action(detail=True, methods=['post'], url_path='clone-quote/(?P<quote_id>[^/.]+)')
+    def clone_quote(self, request, pk=None, quote_id=None):
+        trip = self.get_object()
+        try:
+            source_quote = Quote.objects.get(id=quote_id)
+        except Quote.DoesNotExist:
+            return Response({'error': 'Quote not found'}, status=404)
+        
+        new_quote = Quote.objects.create(
+            trip=trip,
+            title=f"[Template] {source_quote.title}",
+            adults=trip.no_of_adults,
+            children=trip.no_of_children,
+            is_primary=False
+        )
+        
+        for day in source_quote.itinerary_days.all():
+            ItineraryDay.objects.create(
+                quote=new_quote,
+                day_number=day.day_number,
+                location=day.location,
+                activity=day.activity
+            )
+        
+        for variant in source_quote.variants.all():
+            new_variant = QuoteVariant.objects.create(
+                quote=new_quote,
+                name=variant.name,
+                markup_percentage=variant.markup_percentage,
+                gst_percentage=variant.gst_percentage
+            )
+            for hotel in variant.hotels.all():
+                HotelItem.objects.create(
+                    variant=new_variant,
+                    hotel_name=hotel.hotel_name,
+                    check_in=hotel.check_in,
+                    check_out=hotel.check_out,
+                    room_type=hotel.room_type,
+                    rooms_count=hotel.rooms_count,
+                    net_price=hotel.net_price
+                )
+            for transport in variant.transports.all():
+                TransportItem.objects.create(
+                    variant=new_variant,
+                    transport_type=transport.transport_type,
+                    description=transport.description,
+                    date=transport.date,
+                    net_price=transport.net_price
+                )
+        
+        return Response(QuoteSerializer(new_quote).data, status=201)
+
 class ContactViewSet(viewsets.ModelViewSet):
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
@@ -168,3 +256,7 @@ class HotelItemViewSet(viewsets.ModelViewSet):
 class TransportItemViewSet(viewsets.ModelViewSet):
     queryset = TransportItem.objects.all()
     serializer_class = TransportItemSerializer
+
+class ItineraryDayViewSet(viewsets.ModelViewSet):
+    queryset = ItineraryDay.objects.all().order_by('day_number')
+    serializer_class = ItineraryDaySerializer

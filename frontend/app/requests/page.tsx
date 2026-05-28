@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   getTags, 
   createTag, 
@@ -35,23 +36,30 @@ type FollowUp = {
   agent_details?: User;
 };
 
-type Trip = {
+type RawLead = {
   id: number;
-  primary_contact_name: string;
-  phone: string;
-  email: string;
-  origin?: string;
+  source: string;
+  raw_data: string;
+  received_at: string;
+  is_converted: boolean;
+  status: 'NEW' | 'SEEN' | 'DONE';
+  contact_name?: string;
+  phone?: string;
+  email?: string;
   destination?: string;
   start_date?: string;
   end_date?: string;
-  status: 'NEW' | 'IN_PROGRESS' | 'ON_HOLD' | 'CONVERTED' | 'ARCHIVED';
+  no_of_adults?: number;
+  no_of_children?: number;
   assigned_agent_details?: User;
-  tags: number[];
   tags_details?: Tag[];
-  follow_ups: FollowUp[];
+  follow_ups?: FollowUp[];
   due_date?: string;
-  created_at: string;
+  created_at?: string;
+  // fallback: some seeds may still use trip-style fields
+  primary_contact_name?: string;
 };
+
 
 const TAG_COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
@@ -73,15 +81,23 @@ const PREDEFINED_DESTINATIONS = [
 ];
 
 export default function TripPlanRequests() {
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const router = useRouter();
+  const [trips, setTrips] = useState<RawLead[]>([]);
   const [tagsList, setTagsList] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePopoverRow, setActivePopoverRow] = useState<number | null>(null);
   const [currentTab, setCurrentTab] = useState('NEW');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   
   // Followups Modal states
   const [modalOpen, setModalOpen] = useState(false);
-  const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
+  const [currentTrip, setCurrentTrip] = useState<RawLead | null>(null);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [followupNote, setFollowupNote] = useState('');
@@ -90,12 +106,12 @@ export default function TripPlanRequests() {
 
   // Assign Modal states
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [assignTrip, setAssignTrip] = useState<Trip | null>(null);
+  const [assignTrip, setAssignTrip] = useState<RawLead | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<number>(0);
 
   // Conversion Modal states
   const [convertModalOpen, setConvertModalOpen] = useState(false);
-  const [convertingTrip, setConvertingTrip] = useState<Trip | null>(null);
+  const [convertingTrip, setConvertingTrip] = useState<RawLead | null>(null);
   
   // Conversion Form states
   const [refId, setRefId] = useState('');
@@ -152,7 +168,7 @@ export default function TripPlanRequests() {
     };
   }, [currentTab]);
 
-  const handleMarkSeen = (trip: Trip) => {
+  const handleMarkSeen = (trip: RawLead) => {
     if (trip.status === 'NEW') {
       markLeadSeen(trip.id).catch(console.error);
       setTrips(prev => prev.filter(t => t.id !== trip.id));
@@ -181,7 +197,7 @@ export default function TripPlanRequests() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activePopoverRow]);
 
-  const handleOpenEditModal = (trip: Trip) => {
+  const handleOpenEditModal = (trip: RawLead) => {
     setCurrentTrip(trip);
     setSelectedTags(trip.tags_details || []);
     
@@ -237,7 +253,7 @@ export default function TripPlanRequests() {
     setActivePopoverRow(null);
   };
 
-  const handleOpenAssignModal = (trip: Trip) => {
+  const handleOpenAssignModal = (trip: RawLead) => {
     setAssignTrip(trip);
     setSelectedAgentId(trip.assigned_agent_details?.id || 0);
     setAssignModalOpen(true);
@@ -260,7 +276,7 @@ export default function TripPlanRequests() {
   };
 
   // Open conversion modal
-  const handleOpenConvertModal = (trip: Trip) => {
+  const handleOpenConvertModal = (trip: RawLead) => {
     handleMarkSeen(trip);
     setConvertingTrip(trip);
     setRefId(`REF-${trip.id}`);
@@ -281,8 +297,8 @@ export default function TripPlanRequests() {
     setFoc(0);
     
     setSalutation('Mr.');
-    setGuestName(trip.primary_contact_name);
-    setGuestPhone(trip.phone);
+    setGuestName(trip.contact_name || trip.primary_contact_name || '');
+    setGuestPhone(trip.phone || '');
     setNotes('');
 
     setConvertModalOpen(true);
@@ -313,15 +329,16 @@ export default function TripPlanRequests() {
     };
 
     convertLead(convertingTrip.id, payload)
-      .then(() => {
-        // Converted successfully, filter it out from requests view
+      .then((res) => {
+        const newTrip = res.data;
         setTrips(trips.filter(t => t.id !== convertingTrip.id));
         setConvertModalOpen(false);
-        alert('Query successfully created and lead converted to Trip pipeline!');
+        showToast(`✅ Lead converted! Trip #${newTrip.id} created successfully.`);
+        setTimeout(() => router.push(`/trips/${newTrip.id}`), 800);
       })
       .catch((err) => {
         console.error('Failed to convert lead:', err);
-        alert('Error converting lead: ' + (err.response?.data?.detail || err.message));
+        showToast('Error converting lead: ' + (err.response?.data?.detail || err.message), 'error');
       });
   };
 
@@ -520,7 +537,7 @@ export default function TripPlanRequests() {
     setChildAges(childAges.filter((_, i) => i !== index));
   };
 
-  const displayTrips = trips.filter(t => t.status !== 'ARCHIVED');
+  const displayTrips = trips;
 
   if (loading) {
     return (
@@ -538,23 +555,27 @@ export default function TripPlanRequests() {
       
       {/* 3 Simple Tab Filters */}
       <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px', paddingBottom: '0' }}>
-        {['NEW', 'SEEN', 'DONE'].map(tab => (
+        {[
+          { value: 'NEW', label: 'New' },
+          { value: 'SEEN', label: 'In Progress' },
+          { value: 'DONE', label: 'Done' },
+        ].map(tab => (
           <button
-            key={tab}
-            onClick={() => setCurrentTab(tab)}
+            key={tab.value}
+            onClick={() => setCurrentTab(tab.value)}
             style={{
               padding: '12px 16px',
               background: 'none',
               border: 'none',
-              borderBottom: currentTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
-              color: currentTab === tab ? '#3b82f6' : '#64748b',
-              fontWeight: currentTab === tab ? 600 : 500,
+              borderBottom: currentTab === tab.value ? '2px solid #3b82f6' : '2px solid transparent',
+              color: currentTab === tab.value ? '#3b82f6' : '#64748b',
+              fontWeight: currentTab === tab.value ? 600 : 500,
               fontSize: '15px',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
           >
-            {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -585,7 +606,8 @@ export default function TripPlanRequests() {
                     {/* Contact Column */}
                     <td>
                       <div className="contact-cell">
-                        <span className="contact-name">{trip.primary_contact_name}</span>
+                        <span className="contact-name">{trip.contact_name || trip.primary_contact_name || '—'}</span>
+                        <span className="contact-sub" style={{ color: '#64748b', fontSize: '12px' }}>{trip.source}</span>
                         <span className="contact-sub">{trip.phone}</span>
                         <span className="contact-sub">{trip.email}</span>
                       </div>
@@ -594,8 +616,12 @@ export default function TripPlanRequests() {
                     {/* Travel Details Column */}
                     <td>
                       <div className="details-cell">
-                        <span className="details-destination">{trip.origin || 'TBD'} → {trip.destination || 'TBD'}</span>
-                        <span className="details-dates">{trip.start_date || 'TBD'} - {trip.end_date || 'TBD'}</span>
+                        <span className="details-destination">{trip.destination || 'Destination TBD'}</span>
+                        <span className="details-dates">
+                          {trip.start_date ? new Date(trip.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date TBD'}
+                          {trip.no_of_adults ? ` • ${trip.no_of_adults}A` : ''}
+                          {trip.no_of_children ? `, ${trip.no_of_children}C` : ''}
+                        </span>
                       </div>
                     </td>
 
@@ -1200,6 +1226,38 @@ export default function TripPlanRequests() {
           </div>
         </div>
       )}
+
+      {/* Toast Notification - Bottom Left */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '24px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '14px 20px',
+          borderRadius: '10px',
+          background: toast.type === 'success' ? '#0f172a' : '#7f1d1d',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: 500,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          animation: 'slideInLeft 0.3s ease',
+          maxWidth: '380px',
+        }}>
+          <span style={{ fontSize: '18px' }}>{toast.type === 'success' ? '✅' : '❌'}</span>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInLeft {
+          from { transform: translateX(-120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

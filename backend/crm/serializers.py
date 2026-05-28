@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag
+from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag, ItineraryDay
 from django.contrib.auth.models import User
 
 class UserSerializer(serializers.ModelSerializer):
@@ -51,12 +51,18 @@ class QuoteVariantSerializer(serializers.ModelSerializer):
             'price_before_tax', 'gst_amount', 'selling_price'
         ]
 
+class ItineraryDaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ItineraryDay
+        fields = ['id', 'day_number', 'location', 'activity']
+
 class QuoteSerializer(serializers.ModelSerializer):
     variants = QuoteVariantSerializer(many=True, read_only=True)
+    itinerary_days = ItineraryDaySerializer(many=True, read_only=True)
 
     class Meta:
         model = Quote
-        fields = ['id', 'trip', 'title', 'adults', 'children', 'is_primary', 'created_at', 'variants']
+        fields = ['id', 'trip', 'title', 'adults', 'children', 'is_primary', 'created_at', 'variants', 'itinerary_days']
 
 class TripSerializer(serializers.ModelSerializer):
     companions = ContactSerializer(many=True, read_only=True)
