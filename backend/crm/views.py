@@ -21,6 +21,25 @@ class RawLeadViewSet(viewsets.ModelViewSet):
     queryset = RawLead.objects.all().order_by('-received_at')
     serializer_class = RawLeadSerializer
 
+    @action(detail=True, methods=['post'])
+    def convert(self, request, pk=None):
+        lead = self.get_object()
+        if lead.is_converted:
+            return Response({'error': 'Lead already converted'}, status=400)
+            
+        trip_data = request.data.copy()
+        trip_data['status'] = 'NEW'
+        
+        trip_serializer = TripSerializer(data=trip_data)
+        if trip_serializer.is_valid():
+            trip = trip_serializer.save()
+            lead.trip = trip
+            lead.is_converted = True
+            lead.save()
+            return Response(trip_serializer.data, status=201)
+        else:
+            return Response(trip_serializer.errors, status=400)
+
 class TripViewSet(viewsets.ModelViewSet):
     queryset = Trip.objects.all().order_by('-created_at')
     serializer_class = TripSerializer

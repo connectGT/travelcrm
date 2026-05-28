@@ -14,6 +14,7 @@ class RawLead(models.Model):
     raw_data = models.TextField(help_text="The raw query text")
     received_at = models.DateTimeField(auto_now_add=True)
     is_converted = models.BooleanField(default=False)
+    trip = models.ForeignKey('Trip', on_delete=models.SET_NULL, null=True, blank=True, related_name='raw_leads')
 
     def __str__(self):
         return f"Lead from {self.source} at {self.received_at}"
@@ -38,6 +39,15 @@ class Trip(models.Model):
     destination = models.CharField(max_length=255, blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
+    
+    reference_id = models.CharField(max_length=100, blank=True, null=True)
+    no_of_nights = models.PositiveIntegerField(default=0)
+    no_of_adults = models.PositiveIntegerField(default=2)
+    no_of_children = models.PositiveIntegerField(default=0)
+    children_ages = models.CharField(max_length=100, blank=True, null=True)
+    total_foc = models.PositiveIntegerField(default=0)
+    salutation = models.CharField(max_length=20, blank=True, null=True)
+    comments = models.TextField(blank=True, null=True)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
     assigned_agent = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)

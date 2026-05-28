@@ -71,5 +71,7 @@ class TripSerializer(serializers.ModelSerializer):
             'id', 'primary_contact_name', 'email', 'phone', 'origin', 'destination', 
             'start_date', 'end_date', 'status', 'assigned_agent', 'assigned_agent_details',
             'tags', 'tags_details', 'due_date',
+            'reference_id', 'no_of_nights', 'no_of_adults', 'no_of_children', 
+            'children_ages', 'total_foc', 'salutation', 'comments',
             'created_at', 'updated_at', 'companions', 'follow_ups', 'quotes'
         ]
