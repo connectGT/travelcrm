@@ -24,11 +24,19 @@ export default function RootLayout({
               </svg>
             </div>
             <div className="nav-links">
-              <Link href="/">Dashboard</Link>
-              <Link href="/requests">Requests</Link>
-              <Link href="/trips">Trips</Link>
-              <Link href="#">Bookings</Link>
-              <Link href="#">Accounting</Link>
+              <Link href="/dashboard">Dashboard</Link>
+              <div className="nav-dropdown">
+                <span className="nav-dropdown-trigger">Trips ▾</span>
+                <div className="nav-dropdown-menu">
+                  <Link href="/trips">Trips Pipeline</Link>
+                  <Link href="/requests">Trip Plan Requests</Link>
+                  <Link href="/reports">Sales Report</Link>
+                </div>
+              </div>
+              <Link href="/bookings">Bookings</Link>
+              <Link href="/accounting">Accounting</Link>
+              <Link href="/contacts">Contacts</Link>
+              <Link href="/settings">Settings</Link>
             </div>
             <input type="text" className="nav-search" placeholder="Search for trips..." />
           </div>
