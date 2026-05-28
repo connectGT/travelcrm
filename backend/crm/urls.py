@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RawLeadViewSet, TripViewSet, ContactViewSet,
     FollowUpViewSet, QuoteViewSet, QuoteVariantViewSet,
-    HotelItemViewSet, TransportItemViewSet, TagViewSet, ItineraryDayViewSet
+    HotelItemViewSet, TransportItemViewSet, TagViewSet, ItineraryDayViewSet,
+    DestinationViewSet
 )
 
 router = DefaultRouter()
@@ -17,6 +18,7 @@ router.register(r'hotels', HotelItemViewSet)
 router.register(r'transports', TransportItemViewSet)
 router.register(r'tags', TagViewSet)
 router.register(r'itinerary-days', ItineraryDayViewSet)
+router.register(r'destinations', DestinationViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

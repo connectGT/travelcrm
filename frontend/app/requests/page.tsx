@@ -7,7 +7,6 @@ import {
   createTag, 
   saveFollowUp, 
   assignAgent, 
-  archiveTrip,
   convertLead,
   getRawLeads,
   markLeadSeen
@@ -171,7 +170,7 @@ export default function TripPlanRequests() {
   const handleMarkSeen = (trip: RawLead) => {
     if (trip.status === 'NEW') {
       markLeadSeen(trip.id).catch(console.error);
-      setTrips(prev => prev.filter(t => t.id !== trip.id));
+      setTrips(prev => prev.map(t => t.id === trip.id ? { ...t, status: 'SEEN' } : t));
     }
   };
 
@@ -232,25 +231,16 @@ export default function TripPlanRequests() {
         const updatedTrip = res.data;
         setTrips(trips.map(t => t.id === updatedTrip.id ? updatedTrip : t));
         setModalOpen(false);
+        // Move lead to IN_PROGRESS (SEEN) when a follow-up is saved
+        if (currentTrip.status === 'NEW') {
+          markLeadSeen(currentTrip.id).catch(console.error);
+          setTrips(prev => prev.filter(t => t.id !== currentTrip.id));
+        }
       })
       .catch((err) => {
         console.error('Failed to save follow-ups:', err);
         alert('Error saving follow-up notes: ' + (err.response?.data?.detail || err.message));
       });
-  };
-
-  const handleArchiveRequest = (tripId: number) => {
-    if (confirm('Are you sure you want to archive this request?')) {
-      archiveTrip(tripId)
-        .then(() => {
-          setTrips(trips.filter(t => t.id !== tripId));
-        })
-        .catch((err) => {
-          console.error('Failed to archive request:', err);
-          alert('Failed to archive request.');
-        });
-    }
-    setActivePopoverRow(null);
   };
 
   const handleOpenAssignModal = (trip: RawLead) => {
@@ -559,6 +549,7 @@ export default function TripPlanRequests() {
           { value: 'NEW', label: 'New' },
           { value: 'SEEN', label: 'In Progress' },
           { value: 'DONE', label: 'Done' },
+          { value: 'ARCHIVED', label: 'Archived' },
         ].map(tab => (
           <button
             key={tab.value}
@@ -579,6 +570,17 @@ export default function TripPlanRequests() {
           </button>
         ))}
       </div>
+
+      {/* Archived tab warning banner */}
+      {currentTab === 'ARCHIVED' && (
+        <div style={{
+          background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px',
+          padding: '10px 16px', marginBottom: '12px', display: 'flex',
+          alignItems: 'center', gap: '8px', fontSize: '13px', color: '#92400e'
+        }}>
+          ⚠️ Archived requests are <strong>automatically deleted after 30 days</strong>. Run <code>python manage.py cleanup_archived_leads</code> on a schedule to enforce this.
+        </div>
+      )}
 
       <div className="table-card">
         {displayTrips.length === 0 ? (
@@ -685,7 +687,6 @@ export default function TripPlanRequests() {
                         <button 
                           className="btn-icon"
                           onClick={() => {
-                            handleMarkSeen(trip);
                             setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id);
                           }}
                         >
@@ -698,19 +699,46 @@ export default function TripPlanRequests() {
                               className="popover-item"
                               onClick={() => handleOpenEditModal(trip)}
                             >
-                              Edit Tags and Follow-Ups
+                              ✏️ Edit Tags & Follow-Up
                             </button>
                             <button 
                               className="popover-item"
                               onClick={() => handleOpenAssignModal(trip)}
                             >
-                              Assign Team
+                              👤 Assign Team
                             </button>
+                            {/* Mark as Done: lead was rejected / not interested */}
+                            <button 
+                              className="popover-item"
+                              onClick={() => {
+                                fetch(`http://localhost:8000/api/raw-leads/${trip.id}/`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'DONE' })
+                                }).then(() => {
+                                  setTrips(prev => prev.filter(t => t.id !== trip.id));
+                                  setActivePopoverRow(null);
+                                }).catch(console.error);
+                              }}
+                            >
+                              ✅ Mark as Done
+                            </button>
+                            {/* Archive: lead goes to Archived tab, auto-deleted in 30 days */}
                             <button 
                               className="popover-item danger"
-                              onClick={() => handleArchiveRequest(trip.id)}
+                              onClick={() => {
+                                if (confirm('Archive this request? It will be auto-deleted after 30 days.')) {
+                                  fetch(`http://localhost:8000/api/raw-leads/${trip.id}/archive/`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' }
+                                  }).then(() => {
+                                    setTrips(prev => prev.filter(t => t.id !== trip.id));
+                                    setActivePopoverRow(null);
+                                  }).catch(console.error);
+                                }
+                              }}
                             >
-                              Archive Request
+                              🗑️ Archive Request
                             </button>
                           </div>
                         )}

@@ -59,7 +59,7 @@ export default function RootLayout({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <span style={{ cursor: 'pointer', fontSize: '18px' }}>🔔</span>
-              <button style={{ background: '#fef08a', color: '#854d0e', border: 'none', padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>What's New</button>
+              <button style={{ background: '#fef08a', color: '#854d0e', border: 'none', padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>What&apos;s New</button>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', fontWeight: 600, fontSize: '14px' }}>
                 GT
               </div>

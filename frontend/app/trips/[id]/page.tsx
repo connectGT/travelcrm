@@ -1,8 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { getTripById } from '../../../lib/api';
+import { getTripById, getSuggestedQuotes, cloneQuote } from '../../../lib/api';
+
+type ItineraryDay = { day: number; title: string };
+type Hotel = { nights_label: string; name: string; rating: number; location: string };
+type QuoteSuggestion = {
+  id: number;
+  client_name: string;
+  destinations: { city: string; nights: number }[];
+  itinerary: ItineraryDay[];
+  hotels: Hotel[];
+  details: { adults: number; net_price: number; markup: number; gst: number; selling_price: number };
+};
 
 type User = {
   id: number;
@@ -41,7 +51,7 @@ type Trip = {
   assigned_agent_details?: User;
   tags_details?: Tag[];
   follow_ups?: FollowUp[];
-  comments?: any[];
+  comments?: unknown[];
   reference_id?: string;
 };
 
@@ -52,18 +62,37 @@ export default function TripDetailPage() {
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionTab, setSuggestionTab] = useState<Record<number, string>>({});
+  const [cloningQuoteIdx, setCloningQuoteIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    getTripById(id)
-      .then((res) => {
-        setTrip(res.data);
+    let ignore = false;
+    Promise.resolve().then(() => {
+      if (!ignore) {
+        setLoading(true);
+      }
+    });
+    Promise.all([
+      getTripById(id)
+    ]).then(([tripRes]) => {
+      if (!ignore) {
+        setTrip(tripRes.data);
+        getSuggestedQuotes(Number(id))
+          .then(res => { if (!ignore) setSuggestions(res.data || []); })
+          .catch(() => { if (!ignore) setSuggestions([]); });
         setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch trip:', err);
+      }
+    }).catch(err => {
+      if (!ignore) {
+        console.error('Error fetching details:', err);
         setLoading(false);
-      });
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, [id]);
 
   const formatDate = (dateStr?: string) => {
@@ -241,6 +270,125 @@ export default function TripDetailPage() {
               </svg>
             </button>
           </div>
+
+          {/* Smart Quote Suggestions Section */}
+          {suggestions.length > 0 && (
+            <div style={{ margin: '0 0 24px 0' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                💡 Suggested Quotes
+                <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '20px' }}>
+                  {suggestions[0]?.matched_state ? `Based on ${suggestions[0].matched_state}` : suggestions[0]?.destination}
+                </span>
+              </h3>
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '8px' }}>
+                {suggestions.map((s, idx) => {
+                  const activeTab = suggestionTab[idx] || 'itinerary';
+                  const firstQuote = s.quotes?.[0];
+                  const firstVariant = firstQuote?.variants?.[0];
+                  return (
+                    <div key={idx} style={{
+                      minWidth: '290px', maxWidth: '290px', background: 'white',
+                      border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem',
+                      flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      display: 'flex', flexDirection: 'column', gap: '0.5rem'
+                    }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.95rem' }}>{s.destination}</span>
+                        <span style={{ background: '#eff6ff', color: '#3b82f6', borderRadius: '6px', padding: '2px 8px', fontSize: '0.78rem', fontWeight: 500 }}>
+                          {s.no_of_nights}N/{s.no_of_nights + 1}D
+                        </span>
+                      </div>
+                      <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>{s.client_name} · {s.no_of_adults} Adult{s.no_of_adults !== 1 ? 's' : ''}</p>
+
+                      {/* Tabs */}
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                        {['itinerary', 'hotels', 'details'].map(tab => (
+                          <button key={tab}
+                            onClick={() => setSuggestionTab(prev => ({ ...prev, [idx]: tab }))}
+                            style={{
+                              flex: 1, padding: '4px', border: '1px solid',
+                              borderColor: activeTab === tab ? '#3b82f6' : '#e2e8f0',
+                              borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer',
+                              background: activeTab === tab ? '#3b82f6' : 'white',
+                              color: activeTab === tab ? 'white' : '#64748b',
+                              fontWeight: activeTab === tab ? 600 : 400,
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Tab Content */}
+                      <div style={{ minHeight: '90px', fontSize: '0.8rem', color: '#475569', marginTop: '4px' }}>
+                        {activeTab === 'itinerary' && (
+                          firstQuote?.itinerary_days?.length > 0
+                            ? firstQuote.itinerary_days.slice(0, 4).map((day: any) => (
+                                <div key={day.id} style={{ display: 'flex', gap: '6px', padding: '3px 0', borderBottom: '1px solid #f8fafc' }}>
+                                  <span style={{ color: '#94a3b8', minWidth: '36px', fontSize: '0.75rem' }}>Day {day.day_number}</span>
+                                  <span style={{ color: '#334155' }}>{day.location}</span>
+                                </div>
+                              ))
+                            : <span style={{ color: '#94a3b8' }}>No itinerary added</span>
+                        )}
+                        {activeTab === 'hotels' && (
+                          firstVariant?.hotels?.length > 0
+                            ? firstVariant.hotels.slice(0, 3).map((h: any) => (
+                                <div key={h.id} style={{ padding: '3px 0', borderBottom: '1px solid #f8fafc' }}>
+                                  <div style={{ fontWeight: 500, color: '#1e293b' }}>{h.hotel_name}</div>
+                                  <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{h.meal_plan} · {h.room_type} · {'⭐'.repeat(Math.min(h.star_rating || 3, 5))}</div>
+                                </div>
+                              ))
+                            : <span style={{ color: '#94a3b8' }}>No hotels added</span>
+                        )}
+                        {activeTab === 'details' && firstQuote && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div><span style={{ color: '#94a3b8' }}>Destination:</span> {s.destination}</div>
+                            <div><span style={{ color: '#94a3b8' }}>Duration:</span> {s.no_of_nights}N/{s.no_of_nights+1}D</div>
+                            <div><span style={{ color: '#94a3b8' }}>Pax:</span> {s.no_of_adults} Adults</div>
+                            {firstQuote.selling_price_preview && (
+                              <div><span style={{ color: '#94a3b8' }}>Est. Price:</span> ₹{firstQuote.selling_price_preview.rounded_total?.toLocaleString()}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Use this Quote button */}
+                      <button
+                        disabled={cloningQuoteIdx === idx}
+                        onClick={async () => {
+                          if (!firstQuote) return alert('No quote available to clone');
+                          setCloningQuoteIdx(idx);
+                          try {
+                            const tripId = id; // from useParams
+                            const res = await cloneQuote(Number(tripId), firstQuote.id);
+                            const newQuoteId = res.data?.id;
+                            if (!newQuoteId) throw new Error('No quote ID returned');
+                            router.push(`/trips/${tripId}/quotes/${newQuoteId}/edit`);
+                          } catch (e: any) {
+                            alert('Failed to clone quote: ' + (e?.message || 'Unknown error'));
+                          } finally {
+                            setCloningQuoteIdx(null);
+                          }
+                        }}
+                        style={{
+                          width: '100%', padding: '8px', marginTop: '4px',
+                          background: cloningQuoteIdx === idx ? '#93c5fd' : '#3b82f6',
+                          color: 'white', border: 'none', borderRadius: '8px',
+                          cursor: cloningQuoteIdx === idx ? 'not-allowed' : 'pointer',
+                          fontWeight: 600, fontSize: '0.85rem', transition: 'background 0.15s'
+                        }}
+                      >
+                        {cloningQuoteIdx === idx ? 'Cloning...' : 'Use this Quote →'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Main Body Content Placeholders */}
           <div style={{ display: 'flex', gap: '24px' }}>

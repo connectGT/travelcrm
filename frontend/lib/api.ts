@@ -13,8 +13,11 @@ export interface TripSearchParams {
 }
 
 export const getTrips = (params?: TripSearchParams) => api.get('trips/', { params });
-export const getTripById = (id: string) => api.get(`trips/${id}/`);
+export const getTripById = (id: string | number) => api.get(`trips/${id}/`);
+export const getTrip = (id: number) => api.get(`trips/${id}/`);
 export const getQuotes = () => api.get('quotes/');
+export const getQuote = (quoteId: number) => api.get(`quotes/${quoteId}/`);
+export const updateQuote = (quoteId: number, data: Record<string, unknown>) => api.patch(`quotes/${quoteId}/`, data);
 export const getQuoteVariants = () => api.get('quote-variants/');
 export const getSuggestedQuotes = (tripId: number) => api.get(`trips/${tripId}/suggested-quotes/`);
 export const cloneQuote = (tripId: number, quoteId: number) => api.post(`trips/${tripId}/clone-quote/${quoteId}/`);
