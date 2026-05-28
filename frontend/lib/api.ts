@@ -7,7 +7,12 @@ const api = axios.create({
   },
 });
 
-export const getTrips = (params?: any) => api.get('trips/', { params });
+export interface TripSearchParams {
+  status?: string;
+  [key: string]: unknown;
+}
+
+export const getTrips = (params?: TripSearchParams) => api.get('trips/', { params });
 export const getTripById = (id: string) => api.get(`trips/${id}/`);
 export const getQuotes = () => api.get('quotes/');
 export const getQuoteVariants = () => api.get('quote-variants/');
@@ -26,7 +31,12 @@ export const assignAgent = (tripId: number, agentId: number) =>
 export const archiveTrip = (tripId: number) => 
   api.patch(`trips/${tripId}/archive/`, {});
 
-export const getRawLeads = (params?: any) => api.get('raw-leads/', { params });
+export interface RawLeadSearchParams {
+  status?: string;
+  [key: string]: unknown;
+}
+
+export const getRawLeads = (params?: RawLeadSearchParams) => api.get('raw-leads/', { params });
 export const markLeadSeen = (leadId: number) => api.patch(`raw-leads/${leadId}/mark_seen/`, {});
 
 

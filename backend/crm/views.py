@@ -47,10 +47,32 @@ class RawLeadViewSet(viewsets.ModelViewSet):
         lead = self.get_object()
         if lead.is_converted:
             return Response({'error': 'Lead already converted'}, status=400)
-            
-        trip_data = request.data.copy()
-        trip_data['status'] = 'NEW'
-        
+
+        raw = request.data
+
+        # Map frontend field names → TripSerializer field names
+        trip_data = {
+            'status': 'NEW',
+            'primary_contact_name': raw.get('guest_name') or raw.get('primary_contact_name', ''),
+            'phone': raw.get('guest_phone') or raw.get('phone', ''),
+            'email': raw.get('email', ''),
+            'salutation': raw.get('salutation', ''),
+            'destination': raw.get('destinations') or raw.get('destination', ''),
+            'start_date': raw.get('start_date') or None,
+            'no_of_nights': raw.get('nights') or raw.get('no_of_nights', 0),
+            'no_of_adults': raw.get('adults') or raw.get('no_of_adults', 2),
+            'no_of_children': raw.get('no_of_children', 0),
+            'children_ages': raw.get('children_ages', ''),
+            'total_foc': raw.get('foc') or raw.get('total_foc', 0),
+            'comments': raw.get('notes') or raw.get('comments', ''),
+            'reference_id': raw.get('reference_id', ''),
+            'tags': raw.get('tags', []),
+        }
+
+        # Assign agent if provided
+        if raw.get('sales_team_id'):
+            trip_data['assigned_agent'] = raw.get('sales_team_id')
+
         trip_serializer = TripSerializer(data=trip_data)
         if trip_serializer.is_valid():
             trip = trip_serializer.save()

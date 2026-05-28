@@ -17,6 +17,17 @@ class RawLead(models.Model):
     ]
     source = models.CharField(max_length=100, help_text="e.g., WhatsApp, Email, Web Form")
     raw_data = models.TextField(help_text="The raw query text")
+    
+    # Structured Contact Fields
+    contact_name = models.CharField(max_length=255, blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    destination = models.CharField(max_length=255, blank=True, null=True)
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    no_of_adults = models.PositiveIntegerField(default=2)
+    no_of_children = models.PositiveIntegerField(default=0)
+    
     received_at = models.DateTimeField(auto_now_add=True)
     is_converted = models.BooleanField(default=False)
     trip = models.ForeignKey('Trip', on_delete=models.SET_NULL, null=True, blank=True, related_name='raw_leads')

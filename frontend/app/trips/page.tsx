@@ -47,7 +47,7 @@ function TripsContent() {
 
   const fetchTrips = (statusFilter: string) => {
     setLoading(true);
-    const params: any = {};
+    const params: Record<string, unknown> = {};
     if (statusFilter !== 'ALL') {
       params.status = statusFilter;
     }
@@ -64,7 +64,33 @@ function TripsContent() {
   };
 
   useEffect(() => {
-    fetchTrips(currentStatus);
+    let ignore = false;
+    Promise.resolve().then(() => {
+      if (!ignore) {
+        setLoading(true);
+      }
+    });
+    const params: Record<string, unknown> = {};
+    if (currentStatus !== 'ALL') {
+      params.status = currentStatus;
+    }
+    
+    getTrips(params)
+      .then((res) => {
+        if (!ignore) {
+          setTrips(res.data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error('Failed to fetch trips:', err);
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
   }, [currentStatus]);
 
   const handleStatusChange = (statusValue: string) => {

@@ -52,12 +52,23 @@ class Command(BaseCommand):
                 
             name = indian_names[i]
             dest = random.choice(destinations)
-            raw_data = f"Name: {name}, Phone: +91 98765432{i:02d}, Wants to go to {dest} for 5 nights"
+            phone = f"+91 98765432{i:02d}"
+            email = f"{name.lower().replace(' ', '.')}@example.com"
+            raw_data = f"Name: {name}, Phone: {phone}, Wants to go to {dest} for 5 nights"
+            
             RawLead.objects.create(
                 source=random.choice(sources),
                 raw_data=raw_data,
                 is_converted=is_converted,
-                status=status
+                status=status,
+                contact_name=name,
+                phone=phone,
+                email=email,
+                destination=dest,
+                start_date=timezone.now().date() + timedelta(days=random.randint(5, 30)),
+                end_date=timezone.now().date() + timedelta(days=random.randint(5, 30) + 5),
+                no_of_adults=random.randint(1, 4),
+                no_of_children=random.randint(0, 2)
             )
         self.stdout.write(f"Created 10 Raw Leads.")
 

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  getTrips, 
   getTags, 
   createTag, 
   saveFollowUp, 
@@ -128,17 +127,29 @@ export default function TripPlanRequests() {
 
   // Load Real Data on mount and when tab changes
   useEffect(() => {
-    setLoading(true);
+    let ignore = false;
+    Promise.resolve().then(() => {
+      if (!ignore) {
+        setLoading(true);
+      }
+    });
     Promise.all([getRawLeads({ status: currentTab }), getTags()])
       .then(([tripsRes, tagsRes]) => {
-        setTrips(tripsRes.data);
-        setTagsList(tagsRes.data);
-        setLoading(false);
+        if (!ignore) {
+          setTrips(tripsRes.data);
+          setTagsList(tagsRes.data);
+          setLoading(false);
+        }
       })
       .catch((err) => {
-        console.error('Failed to fetch data from API:', err);
-        setLoading(false);
+        if (!ignore) {
+          console.error('Failed to fetch data from API:', err);
+          setLoading(false);
+        }
       });
+    return () => {
+      ignore = true;
+    };
   }, [currentTab]);
 
   const handleMarkSeen = (trip: Trip) => {
