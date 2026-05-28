@@ -6,12 +6,16 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from io import BytesIO
 
-from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem
+from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag
 from .serializers import (
     RawLeadSerializer, TripSerializer, ContactSerializer,
     FollowUpSerializer, QuoteSerializer, QuoteVariantSerializer,
-    HotelItemSerializer, TransportItemSerializer
+    HotelItemSerializer, TransportItemSerializer, TagSerializer
 )
+
+class TagViewSet(viewsets.ModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
 
 class RawLeadViewSet(viewsets.ModelViewSet):
     queryset = RawLead.objects.all().order_by('-received_at')
@@ -21,12 +25,54 @@ class TripViewSet(viewsets.ModelViewSet):
     queryset = Trip.objects.all().order_by('-created_at')
     serializer_class = TripSerializer
 
+    @action(detail=True, methods=['post'])
+    def followups(self, request, pk=None):
+        trip = self.get_object()
+        
+        tags = request.data.get('tags')
+        note = request.data.get('note')
+        due_date = request.data.get('due_date')
+        
+        if tags is not None:
+            trip.tags.set(tags)
+            
+        if due_date:
+            trip.due_date = due_date
+            trip.save()
+            
+        if note and due_date:
+            FollowUp.objects.create(
+                trip=trip,
+                agent=request.user if request.user.is_authenticated else None,
+                due_date=due_date,
+                note=note
+            )
+            
+        return Response(self.get_serializer(trip).data)
+
+    @action(detail=True, methods=['patch'])
+    def assign(self, request, pk=None):
+        trip = self.get_object()
+        agent_id = request.data.get('agent_id')
+        if agent_id is not None:
+            trip.assigned_agent_id = agent_id
+            trip.save()
+            return Response(self.get_serializer(trip).data)
+        return Response({'error': 'agent_id is required'}, status=400)
+
+    @action(detail=True, methods=['patch'])
+    def archive(self, request, pk=None):
+        trip = self.get_object()
+        trip.status = 'ARCHIVED'
+        trip.save()
+        return Response(self.get_serializer(trip).data)
+
 class ContactViewSet(viewsets.ModelViewSet):
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
 
 class FollowUpViewSet(viewsets.ModelViewSet):
-    queryset = FollowUp.objects.all().order_by('scheduled_date')
+    queryset = FollowUp.objects.all().order_by('due_date')
     serializer_class = FollowUpSerializer
 
 class QuoteViewSet(viewsets.ModelViewSet):

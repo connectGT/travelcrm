@@ -1,11 +1,16 @@
 from rest_framework import serializers
-from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem
+from .models import RawLead, Trip, Contact, FollowUp, Quote, QuoteVariant, HotelItem, TransportItem, Tag
 from django.contrib.auth.models import User
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = '__all__'
 
 class RawLeadSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,6 +23,8 @@ class ContactSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class FollowUpSerializer(serializers.ModelSerializer):
+    agent_details = UserSerializer(source='agent', read_only=True)
+    
     class Meta:
         model = FollowUp
         fields = '__all__'
@@ -56,11 +63,13 @@ class TripSerializer(serializers.ModelSerializer):
     follow_ups = FollowUpSerializer(many=True, read_only=True)
     quotes = QuoteSerializer(many=True, read_only=True)
     assigned_agent_details = UserSerializer(source='assigned_agent', read_only=True)
+    tags_details = TagSerializer(source='tags', many=True, read_only=True)
 
     class Meta:
         model = Trip
         fields = [
             'id', 'primary_contact_name', 'email', 'phone', 'origin', 'destination', 
             'start_date', 'end_date', 'status', 'assigned_agent', 'assigned_agent_details',
+            'tags', 'tags_details', 'due_date',
             'created_at', 'updated_at', 'companions', 'follow_ups', 'quotes'
         ]

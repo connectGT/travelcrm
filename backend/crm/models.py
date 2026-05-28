@@ -1,5 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=20, default="#000000")
+
+    def __str__(self):
+        return self.name
 
 class RawLead(models.Model):
     source = models.CharField(max_length=100, help_text="e.g., WhatsApp, Email, Web Form")
@@ -20,6 +28,7 @@ class Trip(models.Model):
         ('PAST_TRIP', 'Past trips'),
         ('CANCELLED', 'Cancelled'),
         ('DROPPED', 'Dropped'),
+        ('ARCHIVED', 'Archived'),
     ]
 
     primary_contact_name = models.CharField(max_length=255)
@@ -32,6 +41,8 @@ class Trip(models.Model):
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
     assigned_agent = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    tags = models.ManyToManyField(Tag, related_name='trips', blank=True)
+    due_date = models.DateTimeField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,12 +62,14 @@ class Contact(models.Model):
 
 class FollowUp(models.Model):
     trip = models.ForeignKey(Trip, related_name='follow_ups', on_delete=models.CASCADE)
-    scheduled_date = models.DateTimeField()
-    note = models.TextField()
+    agent = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    due_date = models.DateTimeField()
+    note = models.CharField(max_length=500)
     is_completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Follow up for {self.trip} on {self.scheduled_date}"
+        return f"Follow up for {self.trip} on {self.due_date}"
 
 class Quote(models.Model):
     trip = models.ForeignKey(Trip, related_name='quotes', on_delete=models.CASCADE)
