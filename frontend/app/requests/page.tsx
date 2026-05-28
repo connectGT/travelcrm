@@ -2,18 +2,36 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { 
+  getTrips, 
+  getTags, 
+  createTag, 
+  saveFollowUp, 
+  assignAgent, 
+  archiveTrip 
+} from '../../lib/api';
 
-type Agent = {
+type User = {
   id: number;
+  username: string;
   first_name: string;
   last_name: string;
+  email: string;
+};
+
+type Tag = {
+  id: number;
+  name: string;
+  color: string;
 };
 
 type FollowUp = {
   id: number;
-  scheduled_date: string;
+  due_date: string;
   note: string;
   is_completed: boolean;
+  created_at: string;
+  agent_details?: User;
 };
 
 type Trip = {
@@ -25,130 +43,67 @@ type Trip = {
   destination?: string;
   start_date?: string;
   end_date?: string;
-  status: 'NEW' | 'IN_PROGRESS' | 'ON_HOLD' | 'CONVERTED';
-  assigned_agent_details?: Agent;
-  tags: string[];
+  status: 'NEW' | 'IN_PROGRESS' | 'ON_HOLD' | 'CONVERTED' | 'ARCHIVED';
+  assigned_agent_details?: User;
+  tags: number[];
+  tags_details?: Tag[];
   follow_ups: FollowUp[];
+  due_date?: string;
+  created_at: string;
 };
 
-// Initial Mock Data
-const INITIAL_TRIPS: Trip[] = [
-  {
-    id: 1,
-    primary_contact_name: 'Aalok Sharma',
-    phone: '+91 98765 43210',
-    email: 'aalok.sharma@example.com',
-    origin: 'Delhi',
-    destination: 'Maldives',
-    start_date: '2026-06-15',
-    end_date: '2026-06-22',
-    status: 'NEW',
-    assigned_agent_details: { id: 1, first_name: 'Aalok', last_name: 'Sharma' },
-    tags: ['CNP', 'VIP'],
-    follow_ups: [
-      {
-        id: 101,
-        scheduled_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-        note: 'Call client to confirm hotel preferences for the beach villa option.',
-        is_completed: false,
-      }
-    ]
-  },
-  {
-    id: 2,
-    primary_contact_name: 'Rohan Gupta',
-    phone: '+91 99999 88888',
-    email: 'rohan.gupta@example.com',
-    origin: 'Mumbai',
-    destination: 'Swiss Alps',
-    start_date: '2026-09-01',
-    end_date: '2026-09-10',
-    status: 'IN_PROGRESS',
-    assigned_agent_details: { id: 2, first_name: 'Amit', last_name: 'Kumar' },
-    tags: ['REVISIT'],
-    follow_ups: [
-      {
-        id: 102,
-        scheduled_date: new Date(Date.now() - 45 * 60 * 1000).toISOString(), // 45 mins ago
-        note: 'Email sent, awaiting passport copy scans from companions.',
-        is_completed: false,
-      }
-    ]
-  },
-  {
-    id: 3,
-    primary_contact_name: 'Tech Corp Group',
-    phone: '+91 91234 56789',
-    email: 'events@techcorp.com',
-    origin: 'Bangalore',
-    destination: 'Goa',
-    start_date: '2026-08-10',
-    end_date: '2026-08-15',
-    status: 'ON_HOLD',
-    assigned_agent_details: { id: 3, first_name: 'Jane', last_name: 'Doe' },
-    tags: ['CORPORATE'],
-    follow_ups: [
-      {
-        id: 103,
-        scheduled_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days from now
-        note: 'Follow up after board meeting decision on team budget approval.',
-        is_completed: false,
-      }
-    ]
-  },
-  {
-    id: 4,
-    primary_contact_name: 'Karan Johar',
-    phone: '+91 88888 77777',
-    email: 'karan@dharmaprod.com',
-    origin: 'Mumbai',
-    destination: 'London',
-    start_date: '2026-07-05',
-    end_date: '2026-07-15',
-    status: 'CONVERTED',
-    assigned_agent_details: { id: 1, first_name: 'Aalok', last_name: 'Sharma' },
-    tags: ['VIP', 'CNP'],
-    follow_ups: [
-      {
-        id: 104,
-        scheduled_date: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 mins from now
-        note: 'Discuss flight availability for the business class upgrades.',
-        is_completed: false,
-      }
-    ]
-  }
+const MOCK_AGENTS = [
+  { id: 1, first_name: 'Aalok', last_name: 'Sharma' },
+  { id: 2, first_name: 'Amit', last_name: 'Kumar' },
+  { id: 3, first_name: 'Jane', last_name: 'Doe' },
 ];
 
-const PREDEFINED_TAGS = ['CNP', 'VIP', 'REVISIT', 'CORPORATE', 'HOT-LEAD', 'BUDGET'];
-
 export default function TripPlanRequests() {
-  const [trips, setTrips] = useState<Trip[]>(INITIAL_TRIPS);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [tagsList, setTagsList] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activePopoverRow, setActivePopoverRow] = useState<number | null>(null);
   
-  // Modal states
+  // Followups Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [followupNote, setFollowupNote] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>(PREDEFINED_TAGS);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Click outside references for closing menus
+  // Assign Modal states
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignTrip, setAssignTrip] = useState<Trip | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<number>(0);
+
+  // Click outside references
   const popoverRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const suggestionsRef = useRef<HTMLDivElement | null>(null);
 
+  // Load Real Data on mount
+  useEffect(() => {
+    Promise.all([getTrips(), getTags()])
+      .then(([tripsRes, tagsRes]) => {
+        setTrips(tripsRes.data);
+        setTagsList(tagsRes.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch data from API:', err);
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      // Close popover
       if (activePopoverRow !== null) {
         const currentRef = popoverRefs.current[activePopoverRow];
         if (currentRef && !currentRef.contains(event.target as Node)) {
           setActivePopoverRow(null);
         }
       }
-      // Close suggestions
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
@@ -159,15 +114,15 @@ export default function TripPlanRequests() {
 
   const handleOpenEditModal = (trip: Trip) => {
     setCurrentTrip(trip);
-    setSelectedTags(trip.tags);
+    setSelectedTags(trip.tags_details || []);
     
-    const latestFollowUp = trip.follow_ups[0];
+    // Sort follow ups by due date to get the upcoming/latest one
+    const latestFollowUp = trip.follow_ups && trip.follow_ups.length > 0 ? trip.follow_ups[0] : null;
     setFollowupNote(latestFollowUp ? latestFollowUp.note : '');
     
     if (latestFollowUp) {
-      // Format to datetime-local expected string: YYYY-MM-DDTHH:MM
-      const date = new Date(latestFollowUp.scheduled_date);
-      const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+      const date = new Date(latestFollowUp.due_date);
+      const tzOffset = date.getTimezoneOffset() * 60000;
       const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
       setDueDate(localISOTime);
     } else {
@@ -181,85 +136,93 @@ export default function TripPlanRequests() {
   const handleSaveFollowups = () => {
     if (!currentTrip) return;
 
-    // Simulate updating the trip object
-    const updatedTrips = trips.map(t => {
-      if (t.id === currentTrip.id) {
-        const updatedFollowups = [...t.follow_ups];
-        if (updatedFollowups.length > 0) {
-          updatedFollowups[0] = {
-            ...updatedFollowups[0],
-            note: followupNote,
-            scheduled_date: new Date(dueDate).toISOString()
-          };
-        } else {
-          updatedFollowups.push({
-            id: Date.now(),
-            note: followupNote,
-            scheduled_date: new Date(dueDate).toISOString(),
-            is_completed: false
-          });
-        }
+    const tagIds = selectedTags.map(t => t.id);
+    const formattedDueDate = new Date(dueDate).toISOString();
 
-        return {
-          ...t,
-          tags: selectedTags,
-          follow_ups: updatedFollowups
-        };
-      }
-      return t;
-    });
-
-    setTrips(updatedTrips);
-    setModalOpen(false);
-    
-    // In future this will trigger POST `/api/trips/${currentTrip.id}/followups`
-    console.log('Saved data:', {
-      tripId: currentTrip.id,
-      tags: selectedTags,
+    saveFollowUp(currentTrip.id, {
+      tags: tagIds,
       note: followupNote,
-      due_date: dueDate
-    });
+      due_date: formattedDueDate
+    })
+      .then((res) => {
+        const updatedTrip = res.data;
+        // Update trips list in state
+        setTrips(trips.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+        setModalOpen(false);
+      })
+      .catch((err) => {
+        console.error('Failed to save follow-ups:', err);
+        alert('Error saving follow-up notes: ' + (err.response?.data?.detail || err.message));
+      });
   };
 
   const handleArchiveRequest = (tripId: number) => {
-    if (confirm('Are you sure you want to archive this trip request?')) {
-      setTrips(trips.filter(t => t.id !== tripId));
+    if (confirm('Are you sure you want to archive this request?')) {
+      archiveTrip(tripId)
+        .then(() => {
+          // Remove archived trip from local requests view
+          setTrips(trips.filter(t => t.id !== tripId));
+        })
+        .catch((err) => {
+          console.error('Failed to archive request:', err);
+          alert('Failed to archive request.');
+        });
     }
     setActivePopoverRow(null);
   };
 
-  const handleAssignTeam = (tripId: number) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-    const name = prompt('Enter agent name to assign:', trip.assigned_agent_details?.first_name || '');
-    if (name) {
-      setTrips(trips.map(t => {
-        if (t.id === tripId) {
-          return {
-            ...t,
-            assigned_agent_details: {
-              id: t.assigned_agent_details?.id || Date.now(),
-              first_name: name,
-              last_name: ''
-            }
-          };
-        }
-        return t;
-      }));
-    }
+  const handleOpenAssignModal = (trip: Trip) => {
+    setAssignTrip(trip);
+    setSelectedAgentId(trip.assigned_agent_details?.id || 0);
+    setAssignModalOpen(true);
     setActivePopoverRow(null);
   };
 
-  // Helper for agent initials
-  const getInitials = (agent?: Agent) => {
+  const handleSaveAssign = () => {
+    if (!assignTrip || !selectedAgentId) return;
+
+    assignAgent(assignTrip.id, selectedAgentId)
+      .then((res) => {
+        const updatedTrip = res.data;
+        setTrips(trips.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+        setAssignModalOpen(false);
+      })
+      .catch((err) => {
+        console.error('Failed to assign agent:', err);
+        alert('Failed to assign team agent.');
+      });
+  };
+
+  const getInitials = (agent?: User) => {
     if (!agent) return 'U';
-    return `${agent.first_name[0] || ''}${agent.last_name[0] || ''}`.toUpperCase();
+    return `${agent.first_name?.[0] || agent.username?.[0] || ''}${agent.last_name?.[0] || ''}`.toUpperCase();
+  };
+
+  // Helper to format creation text relative to now
+  const getCreatedText = (createdAt: string, agentName: string) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffMs = now.getTime() - created.getTime();
+    const diffMins = Math.round(diffMs / (60 * 1000));
+    const diffHours = Math.round(diffMs / (60 * 60 * 1000));
+
+    let timeText = 'in a few seconds';
+    if (diffMins >= 1 && diffMins < 60) {
+      timeText = `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    } else if (diffHours >= 1 && diffHours < 24) {
+      timeText = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffHours >= 24) {
+      const diffDays = Math.round(diffHours / 24);
+      timeText = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    }
+
+    return `${timeText} by ${agentName}`;
   };
 
   // Helper to format due dates dynamically with Urgency alerts
-  const renderFollowupDue = (scheduledDate: string, agentName: string) => {
+  const renderFollowupDue = (followup: FollowUp, agentName: string) => {
     const now = new Date();
-    const due = new Date(scheduledDate);
+    const due = new Date(followup.due_date);
     const diffMs = due.getTime() - now.getTime();
     const diffMins = Math.round(diffMs / (60 * 1000));
     const diffHours = Math.round(diffMs / (60 * 60 * 1000));
@@ -269,7 +232,6 @@ export default function TripPlanRequests() {
     let isUrgent = false;
 
     if (diffMs < 0) {
-      // Past due
       isUrgent = true;
       const absMins = Math.abs(diffMins);
       if (absMins < 60) {
@@ -280,7 +242,6 @@ export default function TripPlanRequests() {
         dueText = `Due ${Math.abs(diffDays)} days ago`;
       }
     } else {
-      // Upcoming due
       if (diffMins < 5) {
         dueText = `Due in a few seconds`;
         isUrgent = true;
@@ -289,179 +250,208 @@ export default function TripPlanRequests() {
         isUrgent = true;
       } else if (diffHours < 24) {
         dueText = `Due in ${diffHours} hours`;
-        isUrgent = true; // Still urgent if within the same day
+        isUrgent = true;
       } else {
         dueText = `Due in ${diffDays} days`;
       }
     }
 
+    const createdDetails = getCreatedText(followup.created_at, agentName);
+
     return (
       <span className={`followup-due-date ${isUrgent ? 'due-date-urgent' : ''}`}>
-        in a few seconds by {agentName || 'Aalok'} • {dueText}
+        {createdDetails} • {dueText}
       </span>
     );
   };
 
   // Autocomplete suggestions search
-  const filteredSuggestions = tagSuggestions.filter(
-    tag => tag.toLowerCase().includes(tagInput.toLowerCase()) && !selectedTags.includes(tag)
+  const filteredSuggestions = tagsList.filter(
+    tag => tag.name.toLowerCase().includes(tagInput.toLowerCase()) && 
+    !selectedTags.some(t => t.id === tag.id)
   );
 
-  const handleAddTag = (tag: string) => {
-    if (tag && !selectedTags.includes(tag)) {
+  const handleAddTag = (tag: Tag) => {
+    if (!selectedTags.some(t => t.id === tag.id)) {
       setSelectedTags([...selectedTags, tag]);
     }
     setTagInput('');
     setShowSuggestions(false);
   };
 
-  const handleRemoveTag = (tag: string) => {
-    setSelectedTags(selectedTags.filter(t => t !== tag));
+  const handleRemoveTag = (tagId: number) => {
+    setSelectedTags(selectedTags.filter(t => t.id !== tagId));
   };
 
   const handleCreateCustomTag = () => {
-    const cleanTag = tagInput.trim().toUpperCase();
-    if (cleanTag && !selectedTags.includes(cleanTag)) {
-      setSelectedTags([...selectedTags, cleanTag]);
-      if (!tagSuggestions.includes(cleanTag)) {
-        setTagSuggestions([...tagSuggestions, cleanTag]);
-      }
+    const cleanTagName = tagInput.trim().toUpperCase();
+    if (!cleanTagName) return;
+
+    const matched = tagsList.find(t => t.name.toUpperCase() === cleanTagName);
+    if (matched) {
+      handleAddTag(matched);
+      return;
     }
-    setTagInput('');
-    setShowSuggestions(false);
+
+    // Call POST /api/tags/
+    createTag({ name: cleanTagName, color: '#f3f4f6' })
+      .then((res) => {
+        const newTagObj = res.data;
+        setTagsList([...tagsList, newTagObj]);
+        setSelectedTags([...selectedTags, newTagObj]);
+        setTagInput('');
+        setShowSuggestions(false);
+      })
+      .catch((err) => {
+        console.error('Failed to create custom tag:', err);
+      });
   };
+
+  const displayTrips = trips.filter(t => t.status !== 'ARCHIVED');
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>Loading requests pipeline...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="requests-header">
         <h1 className="requests-title">Trip Plan Requests</h1>
-        <button className="btn-primary" onClick={() => {
-          alert('Lead creation features are managed under pipeline. This view lists raw/automated requests.');
-        }}>+ New Request</button>
       </div>
 
       <div className="table-card">
-        <table className="requests-table">
-          <thead>
-            <tr>
-              <th style={{ width: '25%' }}>Contact</th>
-              <th style={{ width: '25%' }}>Travel Details</th>
-              <th style={{ width: '35%' }}>Tags and Follow-Ups</th>
-              <th style={{ width: '10%' }}>Team</th>
-              <th style={{ width: '5%', textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trips.map(trip => {
-              const latestFollowUp = trip.follow_ups[0];
-              const agentName = trip.assigned_agent_details?.first_name || 'Aalok';
-              
-              return (
-                <tr key={trip.id}>
-                  {/* Contact Column */}
-                  <td>
-                    <div className="contact-cell">
-                      <span className="contact-name">{trip.primary_contact_name}</span>
-                      <span className="contact-sub">{trip.phone}</span>
-                      <span className="contact-sub">{trip.email}</span>
-                    </div>
-                  </td>
-
-                  {/* Travel Details Column */}
-                  <td>
-                    <div className="details-cell">
-                      <span className="details-destination">{trip.origin || 'TBD'} → {trip.destination || 'TBD'}</span>
-                      <span className="details-dates">{trip.start_date || 'TBD'} - {trip.end_date || 'TBD'}</span>
-                      <span className={`badge-status ${trip.status.toLowerCase()}`}>
-                        {trip.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Tags and Follow-Ups Custom Renderer */}
-                  <td>
-                    <div className="followups-cell">
-                      {trip.tags.length > 0 && (
-                        <div className="tags-row">
-                          {trip.tags.map(tag => (
-                            <span key={tag} className={`tag-badge ${tag.toLowerCase()}`}>
-                              [{tag}]
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {latestFollowUp ? (
-                        <>
-                          <div className="followup-note" title={latestFollowUp.note}>
-                            {latestFollowUp.note}
-                          </div>
-                          {renderFollowupDue(latestFollowUp.scheduled_date, agentName)}
-                        </>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          No pending follow-ups
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Team Column */}
-                  <td>
-                    <div className="team-cell">
-                      <div className="agent-avatar">
-                        {getInitials(trip.assigned_agent_details)}
+        {displayTrips.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            No requests found in pipeline.
+          </div>
+        ) : (
+          <table className="requests-table">
+            <thead>
+              <tr>
+                <th style={{ width: '25%' }}>Contact</th>
+                <th style={{ width: '25%' }}>Travel Details</th>
+                <th style={{ width: '35%' }}>Tags and Follow-Ups</th>
+                <th style={{ width: '15%' }}>Team</th>
+                <th style={{ width: '5%', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayTrips.map(trip => {
+                // followups are ordered by due date, pick first (earliest)
+                const latestFollowUp = trip.follow_ups && trip.follow_ups.length > 0 ? trip.follow_ups[0] : null;
+                const agentName = trip.assigned_agent_details?.first_name || trip.assigned_agent_details?.username || 'Aalok';
+                
+                return (
+                  <tr key={trip.id}>
+                    {/* Contact Column */}
+                    <td>
+                      <div className="contact-cell">
+                        <span className="contact-name">{trip.primary_contact_name}</span>
+                        <span className="contact-sub">{trip.phone}</span>
+                        <span className="contact-sub">{trip.email}</span>
                       </div>
-                      <span className="agent-name">
-                        {trip.assigned_agent_details 
-                          ? `${trip.assigned_agent_details.first_name} ${trip.assigned_agent_details.last_name || ''}`.trim()
-                          : 'Unassigned'}
-                      </span>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Popover Actions Column */}
-                  <td className="action-cell">
-                    <div 
-                      ref={el => { popoverRefs.current[trip.id] = el; }}
-                      style={{ display: 'inline-block' }}
-                    >
-                      <button 
-                        className="btn-icon"
-                        onClick={() => setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id)}
-                      >
-                        ⋮
-                      </button>
+                    {/* Travel Details Column */}
+                    <td>
+                      <div className="details-cell">
+                        <span className="details-destination">{trip.origin || 'TBD'} → {trip.destination || 'TBD'}</span>
+                        <span className="details-dates">{trip.start_date || 'TBD'} - {trip.end_date || 'TBD'}</span>
+                        <span className={`badge-status ${trip.status.toLowerCase()}`}>
+                          {trip.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </td>
 
-                      {activePopoverRow === trip.id && (
-                        <div className="popover-menu">
-                          <button 
-                            className="popover-item"
-                            onClick={() => handleOpenEditModal(trip)}
-                          >
-                            Edit Tags and Follow-Ups
-                          </button>
-                          <button 
-                            className="popover-item"
-                            onClick={() => handleAssignTeam(trip.id)}
-                          >
-                            Assign Team
-                          </button>
-                          <button 
-                            className="popover-item danger"
-                            onClick={() => handleArchiveRequest(trip.id)}
-                          >
-                            Archive Request
-                          </button>
+                    {/* Tags and Follow-Ups Custom Renderer */}
+                    <td>
+                      <div className="followups-cell">
+                        {trip.tags_details && trip.tags_details.length > 0 && (
+                          <div className="tags-row">
+                            {trip.tags_details.map(tag => (
+                              <span key={tag.id} className="tag-badge" style={{ borderColor: tag.color, color: tag.color }}>
+                                [{tag.name}]
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {latestFollowUp ? (
+                          <>
+                            <div className="followup-note" title={latestFollowUp.note}>
+                              {latestFollowUp.note}
+                            </div>
+                            {renderFollowupDue(latestFollowUp, agentName)}
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No pending follow-ups
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Team Column */}
+                    <td>
+                      <div className="team-cell">
+                        <div className="agent-avatar">
+                          {getInitials(trip.assigned_agent_details)}
                         </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        <span className="agent-name">
+                          {trip.assigned_agent_details 
+                            ? `${trip.assigned_agent_details.first_name || trip.assigned_agent_details.username} ${trip.assigned_agent_details.last_name || ''}`.trim()
+                            : 'Unassigned'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Popover Actions Column */}
+                    <td className="action-cell">
+                      <div 
+                        ref={el => { popoverRefs.current[trip.id] = el; }}
+                        style={{ display: 'inline-block' }}
+                      >
+                        <button 
+                          className="btn-icon"
+                          onClick={() => setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id)}
+                        >
+                          ⋮
+                        </button>
+
+                        {activePopoverRow === trip.id && (
+                          <div className="popover-menu">
+                            <button 
+                              className="popover-item"
+                              onClick={() => handleOpenEditModal(trip)}
+                            >
+                              Edit Tags and Follow-Ups
+                            </button>
+                            <button 
+                              className="popover-item"
+                              onClick={() => handleOpenAssignModal(trip)}
+                            >
+                              Assign Team
+                            </button>
+                            <button 
+                              className="popover-item danger"
+                              onClick={() => handleArchiveRequest(trip.id)}
+                            >
+                              Archive Request
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Edit Tags and Follow-Ups Modal */}
@@ -480,13 +470,13 @@ export default function TripPlanRequests() {
                 <div className="tag-autocomplete" ref={suggestionsRef}>
                   <div className="tag-select-box" onClick={() => setShowSuggestions(true)}>
                     {selectedTags.map(tag => (
-                      <span key={tag} className="tag-pill-interactive">
-                        [{tag}]
+                      <span key={tag.id} className="tag-pill-interactive" style={{ color: tag.color, borderColor: tag.color }}>
+                        [{tag.name}]
                         <button 
                           className="tag-remove"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRemoveTag(tag);
+                            handleRemoveTag(tag.id);
                           }}
                         >
                           ×
@@ -506,8 +496,8 @@ export default function TripPlanRequests() {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           if (tagInput.trim()) {
-                            const matchedSuggestion = tagSuggestions.find(
-                              s => s.toLowerCase() === tagInput.trim().toLowerCase()
+                            const matchedSuggestion = tagsList.find(
+                              s => s.name.toLowerCase() === tagInput.trim().toLowerCase()
                             );
                             if (matchedSuggestion) {
                               handleAddTag(matchedSuggestion);
@@ -524,16 +514,16 @@ export default function TripPlanRequests() {
                     <div className="tag-suggestions">
                       {filteredSuggestions.map(tag => (
                         <div 
-                          key={tag}
+                          key={tag.id}
                           className="tag-suggestion-item"
                           onClick={() => handleAddTag(tag)}
                         >
-                          {tag}
+                          {tag.name}
                         </div>
                       ))}
-                      {tagInput.trim() && !tagSuggestions.some(t => t.toLowerCase() === tagInput.trim().toLowerCase()) && (
+                      {tagInput.trim() && !tagsList.some(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && (
                         <div 
-                          className="tag-suggestion-item tag-suggestion-item create-new"
+                          className="tag-suggestion-item create-new"
                           onClick={handleCreateCustomTag}
                         >
                           Create Tag &quot;{tagInput.trim().toUpperCase()}&quot;
@@ -553,7 +543,7 @@ export default function TripPlanRequests() {
                   maxLength={500}
                   value={followupNote}
                   onChange={(e) => setFollowupNote(e.target.value)}
-                  placeholder="Enter follow-up details (e.g. details of last conversation, tasks to do next)..."
+                  placeholder="Enter follow-up details..."
                 />
                 <div className="char-counter">
                   {followupNote.length}/500 characters
@@ -581,6 +571,46 @@ export default function TripPlanRequests() {
                 style={{ opacity: (!dueDate || !followupNote.trim()) ? 0.6 : 1 }}
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Agent Modal */}
+      {assignModalOpen && assignTrip && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Assign Agent</h3>
+              <button className="modal-close" onClick={() => setAssignModalOpen(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Select Agent</label>
+                <select 
+                  className="form-input"
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(Number(e.target.value))}
+                >
+                  <option value={0}>Unassigned</option>
+                  {MOCK_AGENTS.map(agent => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.first_name} {agent.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setAssignModalOpen(false)}>Cancel</button>
+              <button 
+                className="btn-save" 
+                onClick={handleSaveAssign}
+              >
+                Save Assignment
               </button>
             </div>
           </div>
