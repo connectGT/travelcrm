@@ -26,7 +26,24 @@ export const assignAgent = (tripId: number, agentId: number) =>
 export const archiveTrip = (tripId: number) => 
   api.patch(`trips/${tripId}/archive/`, {});
 
-export const convertLead = (leadId: number, data: any) =>
+export interface LeadConversionData {
+  query_source?: string;
+  reference_id?: string;
+  sales_team_id?: number;
+  tags?: number[];
+  destinations?: string;
+  start_date?: string | null;
+  nights?: number;
+  adults?: number;
+  children_ages?: string;
+  foc?: number;
+  salutation?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  notes?: string;
+}
+
+export const convertLead = (leadId: number, data: LeadConversionData) =>
   api.post(`leads/${leadId}/convert/`, data);
 
 export default api;

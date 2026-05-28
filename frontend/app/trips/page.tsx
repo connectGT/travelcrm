@@ -42,6 +42,14 @@ export default function TripsKanban() {
     if (!agent) return 'U';
     return `${agent.first_name?.[0] || ''}${agent.last_name?.[0] || ''}`.toUpperCase();
   };
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>Loading trips pipeline...</div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
