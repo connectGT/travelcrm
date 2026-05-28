@@ -8,7 +8,8 @@ import {
   createTag, 
   saveFollowUp, 
   assignAgent, 
-  archiveTrip 
+  archiveTrip,
+  convertLead
 } from '../../lib/api';
 
 type User = {
@@ -58,6 +59,11 @@ const MOCK_AGENTS = [
   { id: 3, first_name: 'Jane', last_name: 'Doe' },
 ];
 
+const PREDEFINED_DESTINATIONS = [
+  'Maldives', 'Swiss Alps', 'Goa', 'London', 'Kashmir', 
+  'Bali', 'Dubai', 'Singapore', 'Paris', 'New York'
+];
+
 export default function TripPlanRequests() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tagsList, setTagsList] = useState<Tag[]>([]);
@@ -78,9 +84,37 @@ export default function TripPlanRequests() {
   const [assignTrip, setAssignTrip] = useState<Trip | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<number>(0);
 
+  // Conversion Modal states
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
+  const [convertingTrip, setConvertingTrip] = useState<Trip | null>(null);
+  
+  // Conversion Form states
+  const [refId, setRefId] = useState('');
+  const [salesTeamId, setSalesTeamId] = useState(1);
+  const [convertTags, setConvertTags] = useState<Tag[]>([]);
+  const [convertTagInput, setConvertTagInput] = useState('');
+  const [showConvertTagSuggestions, setShowConvertTagSuggestions] = useState(false);
+
+  const [destinations, setDestinations] = useState<string[]>([]);
+  const [destInput, setDestInput] = useState('');
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+
+  const [startDate, setStartDate] = useState('');
+  const [nights, setNights] = useState(5);
+  const [adults, setAdults] = useState(2);
+  const [childAges, setChildAges] = useState<number[]>([]);
+  const [foc, setFoc] = useState(0);
+
+  const [salutation, setSalutation] = useState('Mr.');
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [notes, setNotes] = useState('');
+
   // Click outside references
   const popoverRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const suggestionsRef = useRef<HTMLDivElement | null>(null);
+  const convertTagSuggestionsRef = useRef<HTMLDivElement | null>(null);
+  const destSuggestionsRef = useRef<HTMLDivElement | null>(null);
 
   // Load Real Data on mount
   useEffect(() => {
@@ -107,6 +141,12 @@ export default function TripPlanRequests() {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
+      if (convertTagSuggestionsRef.current && !convertTagSuggestionsRef.current.contains(event.target as Node)) {
+        setShowConvertTagSuggestions(false);
+      }
+      if (destSuggestionsRef.current && !destSuggestionsRef.current.contains(event.target as Node)) {
+        setShowDestSuggestions(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -116,7 +156,6 @@ export default function TripPlanRequests() {
     setCurrentTrip(trip);
     setSelectedTags(trip.tags_details || []);
     
-    // Sort follow ups by due date to get the upcoming/latest one
     const latestFollowUp = trip.follow_ups && trip.follow_ups.length > 0 ? trip.follow_ups[0] : null;
     setFollowupNote(latestFollowUp ? latestFollowUp.note : '');
     
@@ -146,7 +185,6 @@ export default function TripPlanRequests() {
     })
       .then((res) => {
         const updatedTrip = res.data;
-        // Update trips list in state
         setTrips(trips.map(t => t.id === updatedTrip.id ? updatedTrip : t));
         setModalOpen(false);
       })
@@ -160,7 +198,6 @@ export default function TripPlanRequests() {
     if (confirm('Are you sure you want to archive this request?')) {
       archiveTrip(tripId)
         .then(() => {
-          // Remove archived trip from local requests view
           setTrips(trips.filter(t => t.id !== tripId));
         })
         .catch((err) => {
@@ -190,6 +227,71 @@ export default function TripPlanRequests() {
       .catch((err) => {
         console.error('Failed to assign agent:', err);
         alert('Failed to assign team agent.');
+      });
+  };
+
+  // Open conversion modal
+  const handleOpenConvertModal = (trip: Trip) => {
+    setConvertingTrip(trip);
+    setRefId(`REF-${trip.id}`);
+    setSalesTeamId(trip.assigned_agent_details?.id || MOCK_AGENTS[0].id);
+    setConvertTags(trip.tags_details || []);
+    
+    // Default destinations list
+    if (trip.destination) {
+      setDestinations([trip.destination]);
+    } else {
+      setDestinations([]);
+    }
+
+    setStartDate(trip.start_date || '');
+    setNights(5);
+    setAdults(2);
+    setChildAges([]);
+    setFoc(0);
+    
+    setSalutation('Mr.');
+    setGuestName(trip.primary_contact_name);
+    setGuestPhone(trip.phone);
+    setNotes('');
+
+    setConvertModalOpen(true);
+  };
+
+  const handleSaveConversion = () => {
+    if (!convertingTrip) return;
+
+    const tagIds = convertTags.map(t => t.id);
+    const destString = destinations.join(', ');
+    const childrenAgesString = childAges.join(', ');
+
+    const payload = {
+      query_source: 'WhatsApp', // Default/read-only source
+      reference_id: refId,
+      sales_team_id: salesTeamId,
+      tags: tagIds,
+      destinations: destString,
+      start_date: startDate ? new Date(startDate).toISOString().slice(0, 10) : null,
+      nights: Number(nights),
+      adults: Number(adults),
+      children_ages: childrenAgesString,
+      foc: Number(foc),
+      salutation,
+      guest_name: guestName,
+      guest_phone: guestPhone,
+      notes
+    };
+
+    convertLead(convertingTrip.id, payload)
+      .then(() => {
+        // Converted successfully, filter it out from requests view
+        setTrips(trips.filter(t => t.id !== convertingTrip.id));
+        setConvertModalOpen(false);
+        alert('Query successfully created and lead converted to Trip pipeline!');
+      })
+      .catch((err) => {
+        console.error('Failed to convert lead:', err);
+        alert('Error converting lead: ' + (err.response?.data?.detail || err.message));
       });
   };
 
@@ -265,7 +367,7 @@ export default function TripPlanRequests() {
     );
   };
 
-  // Autocomplete suggestions search
+  // Autocomplete tags suggestions
   const filteredSuggestions = tagsList.filter(
     tag => tag.name.toLowerCase().includes(tagInput.toLowerCase()) && 
     !selectedTags.some(t => t.id === tag.id)
@@ -293,7 +395,6 @@ export default function TripPlanRequests() {
       return;
     }
 
-    // Call POST /api/tags/
     createTag({ name: cleanTagName, color: '#f3f4f6' })
       .then((res) => {
         const newTagObj = res.data;
@@ -305,6 +406,88 @@ export default function TripPlanRequests() {
       .catch((err) => {
         console.error('Failed to create custom tag:', err);
       });
+  };
+
+  // Autocomplete suggestions for Conversion tags
+  const filteredConvertTagSuggestions = tagsList.filter(
+    tag => tag.name.toLowerCase().includes(convertTagInput.toLowerCase()) && 
+    !convertTags.some(t => t.id === tag.id)
+  );
+
+  const handleAddConvertTag = (tag: Tag) => {
+    if (!convertTags.some(t => t.id === tag.id)) {
+      setConvertTags([...convertTags, tag]);
+    }
+    setConvertTagInput('');
+    setShowConvertTagSuggestions(false);
+  };
+
+  const handleRemoveConvertTag = (tagId: number) => {
+    setConvertTags(convertTags.filter(t => t.id !== tagId));
+  };
+
+  const handleCreateConvertCustomTag = () => {
+    const cleanTagName = convertTagInput.trim().toUpperCase();
+    if (!cleanTagName) return;
+
+    const matched = tagsList.find(t => t.name.toUpperCase() === cleanTagName);
+    if (matched) {
+      handleAddConvertTag(matched);
+      return;
+    }
+
+    createTag({ name: cleanTagName, color: '#f3f4f6' })
+      .then((res) => {
+        const newTagObj = res.data;
+        setTagsList([...tagsList, newTagObj]);
+        setConvertTags([...convertTags, newTagObj]);
+        setConvertTagInput('');
+        setShowConvertTagSuggestions(false);
+      })
+      .catch((err) => {
+        console.error('Failed to create convert tag:', err);
+      });
+  };
+
+  // Autocomplete suggestions for Destinations
+  const filteredDestSuggestions = PREDEFINED_DESTINATIONS.filter(
+    dest => dest.toLowerCase().includes(destInput.toLowerCase()) && !destinations.includes(dest)
+  );
+
+  const handleAddDestination = (dest: string) => {
+    if (dest && !destinations.includes(dest)) {
+      setDestinations([...destinations, dest]);
+    }
+    setDestInput('');
+    setShowDestSuggestions(false);
+  };
+
+  const handleRemoveDestination = (dest: string) => {
+    setDestinations(destinations.filter(d => d !== dest));
+  };
+
+  const handleCreateCustomDestination = () => {
+    const cleanDest = destInput.trim();
+    if (cleanDest && !destinations.includes(cleanDest)) {
+      setDestinations([...destinations, cleanDest]);
+    }
+    setDestInput('');
+    setShowDestSuggestions(false);
+  };
+
+  // Dynamic children ages handler
+  const handleAddChildAge = () => {
+    setChildAges([...childAges, 5]); // Default age of 5
+  };
+
+  const handleUpdateChildAge = (index: number, age: number) => {
+    const updated = [...childAges];
+    updated[index] = age;
+    setChildAges(updated);
+  };
+
+  const handleRemoveChildAge = (index: number) => {
+    setChildAges(childAges.filter((_, i) => i !== index));
   };
 
   const displayTrips = trips.filter(t => t.status !== 'ARCHIVED');
@@ -341,7 +524,6 @@ export default function TripPlanRequests() {
             </thead>
             <tbody>
               {displayTrips.map(trip => {
-                // followups are ordered by due date, pick first (earliest)
                 const latestFollowUp = trip.follow_ups && trip.follow_ups.length > 0 ? trip.follow_ups[0] : null;
                 const agentName = trip.assigned_agent_details?.first_name || trip.assigned_agent_details?.username || 'Aalok';
                 
@@ -409,12 +591,21 @@ export default function TripPlanRequests() {
                       </div>
                     </td>
 
-                    {/* Popover Actions Column */}
+                    {/* Actions Column */}
                     <td className="action-cell">
                       <div 
                         ref={el => { popoverRefs.current[trip.id] = el; }}
-                        style={{ display: 'inline-block' }}
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
                       >
+                        {/* Convert to Query Trigger (+) */}
+                        <button 
+                          className="btn-convert-trigger"
+                          onClick={() => handleOpenConvertModal(trip)}
+                          title="Create New Query"
+                        >
+                          +
+                        </button>
+
                         <button 
                           className="btn-icon"
                           onClick={() => setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id)}
@@ -611,6 +802,346 @@ export default function TripPlanRequests() {
                 onClick={handleSaveAssign}
               >
                 Save Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Query from Request (Lead Conversion) Modal */}
+      {convertModalOpen && convertingTrip && (
+        <div className="modal-overlay">
+          <div className="modal-content large">
+            <div className="modal-header">
+              <h3>Create New Query from Request</h3>
+              <button className="modal-close" onClick={() => setConvertModalOpen(false)}>×</button>
+            </div>
+            
+            <div className="modal-body" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+              <div className="form-grid-2">
+                
+                {/* SECTION 1: Query Source */}
+                <div className="form-section-title">1. Query Source</div>
+                
+                <div className="form-group">
+                  <label className="form-label">Query Source</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value="WhatsApp" 
+                    readOnly 
+                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label className="form-label">Reference ID</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={refId}
+                    onChange={(e) => setRefId(e.target.value)}
+                    placeholder="Enter Reference ID"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Sales Team</label>
+                  <select 
+                    className="form-input"
+                    value={salesTeamId}
+                    onChange={(e) => setSalesTeamId(Number(e.target.value))}
+                  >
+                    {MOCK_AGENTS.map(agent => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.first_name} {agent.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Tags</label>
+                  <div className="tag-autocomplete" ref={convertTagSuggestionsRef}>
+                    <div className="tag-select-box" onClick={() => setShowConvertTagSuggestions(true)}>
+                      {convertTags.map(tag => (
+                        <span key={tag.id} className="tag-pill-interactive" style={{ color: tag.color, borderColor: tag.color }}>
+                          [{tag.name}]
+                          <button 
+                            className="tag-remove"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveConvertTag(tag.id);
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input 
+                        type="text"
+                        className="tag-select-input"
+                        placeholder={convertTags.length === 0 ? "Select or create tags..." : ""}
+                        value={convertTagInput}
+                        onChange={(e) => {
+                          setConvertTagInput(e.target.value);
+                          setShowConvertTagSuggestions(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (convertTagInput.trim()) {
+                              const matched = tagsList.find(
+                                s => s.name.toLowerCase() === convertTagInput.trim().toLowerCase()
+                              );
+                              if (matched) {
+                                handleAddConvertTag(matched);
+                              } else {
+                                handleCreateConvertCustomTag();
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {showConvertTagSuggestions && (convertTagInput || filteredConvertTagSuggestions.length > 0) && (
+                      <div className="tag-suggestions">
+                        {filteredConvertTagSuggestions.map(tag => (
+                          <div 
+                            key={tag.id}
+                            className="tag-suggestion-item"
+                            onClick={() => handleAddConvertTag(tag)}
+                          >
+                            {tag.name}
+                          </div>
+                        ))}
+                        {convertTagInput.trim() && !tagsList.some(t => t.name.toLowerCase() === convertTagInput.trim().toLowerCase()) && (
+                          <div 
+                            className="tag-suggestion-item create-new"
+                            onClick={handleCreateConvertCustomTag}
+                          >
+                            Create Tag &quot;{convertTagInput.trim().toUpperCase()}&quot;
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SECTION 2: Destination and Duration */}
+                <div className="form-section-title">2. Destination &amp; Duration</div>
+                
+                <div className="form-group span-2">
+                  <label className="form-label">Destinations (Creatable Select)</label>
+                  <div className="dest-autocomplete" ref={destSuggestionsRef}>
+                    <div className="dest-select-box" onClick={() => setShowDestSuggestions(true)}>
+                      {destinations.map(dest => (
+                        <span key={dest} className="dest-pill">
+                          {dest}
+                          <button 
+                            className="dest-remove"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveDestination(dest);
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input 
+                        type="text"
+                        className="dest-select-input"
+                        placeholder={destinations.length === 0 ? "Search or type to add destinations..." : ""}
+                        value={destInput}
+                        onChange={(e) => {
+                          setDestInput(e.target.value);
+                          setShowDestSuggestions(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (destInput.trim()) {
+                              const matched = PREDEFINED_DESTINATIONS.find(
+                                d => d.toLowerCase() === destInput.trim().toLowerCase()
+                              );
+                              if (matched) {
+                                handleAddDestination(matched);
+                              } else {
+                                handleCreateCustomDestination();
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {showDestSuggestions && (destInput || filteredDestSuggestions.length > 0) && (
+                      <div className="dest-suggestions">
+                        {filteredDestSuggestions.map(dest => (
+                          <div 
+                            key={dest}
+                            className="dest-suggestion-item"
+                            onClick={() => handleAddDestination(dest)}
+                          >
+                            {dest}
+                          </div>
+                        ))}
+                        {destInput.trim() && !PREDEFINED_DESTINATIONS.some(d => d.toLowerCase() === destInput.trim().toLowerCase()) && (
+                          <div 
+                            className="dest-suggestion-item create-new"
+                            onClick={handleCreateCustomDestination}
+                          >
+                            Add Destination &quot;{destInput.trim()}&quot;
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Start Date</label>
+                  <input 
+                    type="date"
+                    className="form-input"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">No. of Nights</label>
+                  <input 
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    value={nights}
+                    onChange={(e) => setNights(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">No. of Adults</label>
+                  <input 
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    value={adults}
+                    onChange={(e) => setAdults(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Total FOC</label>
+                  <input 
+                    type="number"
+                    className="form-input"
+                    min={0}
+                    value={foc}
+                    onChange={(e) => setFoc(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="form-group span-2">
+                  <label className="form-label">Children and Ages</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {childAges.map((age, index) => (
+                      <div key={index} className="child-age-row">
+                        <span style={{ fontSize: '13px' }}>Child #{index + 1} Age:</span>
+                        <input 
+                          type="number" 
+                          className="form-input child-age-input" 
+                          min={0} 
+                          max={17}
+                          value={age} 
+                          onChange={(e) => handleUpdateChildAge(index, Number(e.target.value))}
+                        />
+                        <button 
+                          className="btn-remove-child"
+                          onClick={() => handleRemoveChildAge(index)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <div>
+                      <button 
+                        className="btn-add-child"
+                        onClick={handleAddChildAge}
+                      >
+                        + Add Child
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 3: Guest Details */}
+                <div className="form-section-title">3. Guest Details</div>
+                
+                <div className="form-group">
+                  <label className="form-label">Salutation</label>
+                  <select 
+                    className="form-input"
+                    value={salutation}
+                    onChange={(e) => setSalutation(e.target.value)}
+                  >
+                    <option value="Mr.">Mr.</option>
+                    <option value="Mrs.">Mrs.</option>
+                    <option value="Ms.">Ms.</option>
+                    <option value="Dr.">Dr.</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Guest Name</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Enter Guest Full Name"
+                  />
+                </div>
+
+                <div className="form-group span-2">
+                  <label className="form-label">Phone Number(s)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="Enter phone contact(s) (e.g. +91 99999 88888)"
+                  />
+                </div>
+
+                {/* SECTION 4: Comments or Notes */}
+                <div className="form-section-title">4. Comments or Notes</div>
+
+                <div className="form-group span-2">
+                  <label className="form-label">Comments</label>
+                  <textarea 
+                    className="form-input" 
+                    style={{ minHeight: '80px', resize: 'vertical' }}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Provide additional details or special requests..."
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setConvertModalOpen(false)}>Cancel</button>
+              <button 
+                className="btn-save" 
+                onClick={handleSaveConversion}
+                disabled={!guestName.trim() || !guestPhone.trim() || destinations.length === 0}
+                style={{ opacity: (!guestName.trim() || !guestPhone.trim() || destinations.length === 0) ? 0.6 : 1 }}
+              >
+                Save Details &amp; Convert
               </button>
             </div>
           </div>

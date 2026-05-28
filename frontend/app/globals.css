@@ -928,3 +928,191 @@ body {
   background-color: #1f2937;
   color: var(--nav-text-hover) !important;
 }
+
+/* Conversion Modal Styling */
+.modal-content.large {
+  max-width: 680px;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  grid-column: span 2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.btn-convert-trigger {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #10b981;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background-color 0.2s, color 0.2s;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.btn-convert-trigger:hover {
+  background-color: #ecfdf5;
+  color: #047857;
+}
+
+/* Destinations pill select styling */
+.dest-autocomplete {
+  position: relative;
+}
+
+.dest-select-box {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px;
+  min-height: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+.dest-select-box:focus-within {
+  border-color: var(--accent-blue-text);
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+}
+
+.dest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+.dest-remove {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0 2px;
+  font-size: 12px;
+}
+
+.dest-remove:hover {
+  color: #374151;
+}
+
+.dest-select-input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  flex: 1;
+  min-width: 100px;
+  padding: 4px 0;
+  font-family: inherit;
+}
+
+.dest-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  z-index: 110;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.dest-suggestion-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dest-suggestion-item:hover {
+  background-color: #f3f4f6;
+}
+
+.dest-suggestion-item.create-new {
+  color: var(--accent-blue-text);
+  font-weight: 500;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Child age rows */
+.child-age-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.child-age-input {
+  width: 70px !important;
+  text-align: center;
+}
+
+.btn-add-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--accent-blue);
+  color: var(--accent-blue-text);
+  border: 1px solid #dbeafe;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background-color 0.2s;
+}
+
+.btn-add-child:hover {
+  background-color: #dbeafe;
+}
+
+.btn-remove-child {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  line-height: 1;
+}
+
+.btn-remove-child:hover {
+  opacity: 0.8;
+}
