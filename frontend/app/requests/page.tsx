@@ -8,7 +8,9 @@ import {
   saveFollowUp, 
   assignAgent, 
   archiveTrip,
-  convertLead
+  convertLead,
+  getRawLeads,
+  markLeadSeen
 } from '../../lib/api';
 
 type User = {
@@ -52,6 +54,14 @@ type Trip = {
   created_at: string;
 };
 
+const TAG_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
+  '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e',
+  '#84cc16', '#a855f7', '#0ea5e9', '#10b981', '#fb923c',
+];
+
+const getRandomTagColor = () => TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
+
 const MOCK_AGENTS = [
   { id: 1, first_name: 'Aalok', last_name: 'Sharma' },
   { id: 2, first_name: 'Amit', last_name: 'Kumar' },
@@ -68,6 +78,7 @@ export default function TripPlanRequests() {
   const [tagsList, setTagsList] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePopoverRow, setActivePopoverRow] = useState<number | null>(null);
+  const [currentTab, setCurrentTab] = useState('NEW');
   
   // Followups Modal states
   const [modalOpen, setModalOpen] = useState(false);
@@ -115,9 +126,10 @@ export default function TripPlanRequests() {
   const convertTagSuggestionsRef = useRef<HTMLDivElement | null>(null);
   const destSuggestionsRef = useRef<HTMLDivElement | null>(null);
 
-  // Load Real Data on mount
+  // Load Real Data on mount and when tab changes
   useEffect(() => {
-    Promise.all([getTrips(), getTags()])
+    setLoading(true);
+    Promise.all([getRawLeads({ status: currentTab }), getTags()])
       .then(([tripsRes, tagsRes]) => {
         setTrips(tripsRes.data);
         setTagsList(tagsRes.data);
@@ -127,7 +139,14 @@ export default function TripPlanRequests() {
         console.error('Failed to fetch data from API:', err);
         setLoading(false);
       });
-  }, []);
+  }, [currentTab]);
+
+  const handleMarkSeen = (trip: Trip) => {
+    if (trip.status === 'NEW') {
+      markLeadSeen(trip.id).catch(console.error);
+      setTrips(prev => prev.filter(t => t.id !== trip.id));
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -231,6 +250,7 @@ export default function TripPlanRequests() {
 
   // Open conversion modal
   const handleOpenConvertModal = (trip: Trip) => {
+    handleMarkSeen(trip);
     setConvertingTrip(trip);
     setRefId(`REF-${trip.id}`);
     setSalesTeamId(trip.assigned_agent_details?.id || MOCK_AGENTS[0].id);
@@ -394,7 +414,7 @@ export default function TripPlanRequests() {
       return;
     }
 
-    createTag({ name: cleanTagName, color: '#f3f4f6' })
+    createTag({ name: cleanTagName, color: getRandomTagColor() })
       .then((res) => {
         const newTagObj = res.data;
         setTagsList([...tagsList, newTagObj]);
@@ -435,7 +455,7 @@ export default function TripPlanRequests() {
       return;
     }
 
-    createTag({ name: cleanTagName, color: '#f3f4f6' })
+    createTag({ name: cleanTagName, color: getRandomTagColor() })
       .then((res) => {
         const newTagObj = res.data;
         setTagsList([...tagsList, newTagObj]);
@@ -504,6 +524,29 @@ export default function TripPlanRequests() {
       <div className="requests-header">
         <h1 className="requests-title">Trip Plan Requests</h1>
       </div>
+      
+      {/* 3 Simple Tab Filters */}
+      <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px', paddingBottom: '0' }}>
+        {['NEW', 'SEEN', 'DONE'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setCurrentTab(tab)}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: currentTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
+              color: currentTab === tab ? '#3b82f6' : '#64748b',
+              fontWeight: currentTab === tab ? 600 : 500,
+              fontSize: '15px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {tab.charAt(0) + tab.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
 
       <div className="table-card">
         {displayTrips.length === 0 ? (
@@ -542,9 +585,6 @@ export default function TripPlanRequests() {
                       <div className="details-cell">
                         <span className="details-destination">{trip.origin || 'TBD'} → {trip.destination || 'TBD'}</span>
                         <span className="details-dates">{trip.start_date || 'TBD'} - {trip.end_date || 'TBD'}</span>
-                        <span className={`badge-status ${trip.status.toLowerCase()}`}>
-                          {trip.status.replace('_', ' ')}
-                        </span>
                       </div>
                     </td>
 
@@ -607,7 +647,10 @@ export default function TripPlanRequests() {
 
                         <button 
                           className="btn-icon"
-                          onClick={() => setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id)}
+                          onClick={() => {
+                            handleMarkSeen(trip);
+                            setActivePopoverRow(activePopoverRow === trip.id ? null : trip.id);
+                          }}
                         >
                           ⋮
                         </button>

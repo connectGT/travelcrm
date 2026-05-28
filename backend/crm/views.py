@@ -21,6 +21,27 @@ class RawLeadViewSet(viewsets.ModelViewSet):
     queryset = RawLead.objects.all().order_by('-received_at')
     serializer_class = RawLeadSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status = self.request.query_params.get('status', None)
+        if status is not None:
+            queryset = queryset.filter(status=status)
+        return queryset
+
+    @action(detail=True, methods=['patch'])
+    def mark_seen(self, request, pk=None):
+        lead = self.get_object()
+        lead.status = 'SEEN'
+        lead.save()
+        return Response(self.get_serializer(lead).data)
+
+    @action(detail=True, methods=['patch'])
+    def archive(self, request, pk=None):
+        lead = self.get_object()
+        lead.status = 'DONE'
+        lead.save()
+        return Response(self.get_serializer(lead).data)
+
     @action(detail=True, methods=['post'])
     def convert(self, request, pk=None):
         lead = self.get_object()
@@ -35,6 +56,7 @@ class RawLeadViewSet(viewsets.ModelViewSet):
             trip = trip_serializer.save()
             lead.trip = trip
             lead.is_converted = True
+            lead.status = 'DONE'
             lead.save()
             return Response(trip_serializer.data, status=201)
         else:

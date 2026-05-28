@@ -40,14 +40,24 @@ class Command(BaseCommand):
         
         RawLead.objects.all().delete()
         for i in range(10):
-            is_converted = i >= 7  # 7 False, 3 True
+            if i < 5:
+                status = 'NEW'
+                is_converted = False
+            elif i < 8:
+                status = 'SEEN'
+                is_converted = False
+            else:
+                status = 'DONE'
+                is_converted = True
+                
             name = indian_names[i]
             dest = random.choice(destinations)
             raw_data = f"Name: {name}, Phone: +91 98765432{i:02d}, Wants to go to {dest} for 5 nights"
             RawLead.objects.create(
                 source=random.choice(sources),
                 raw_data=raw_data,
-                is_converted=is_converted
+                is_converted=is_converted,
+                status=status
             )
         self.stdout.write(f"Created 10 Raw Leads.")
 

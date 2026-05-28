@@ -10,11 +10,17 @@ class Tag(models.Model):
         return self.name
 
 class RawLead(models.Model):
+    STATUS_CHOICES = [
+        ('NEW', 'New'),
+        ('SEEN', 'Seen'),
+        ('DONE', 'Done'),
+    ]
     source = models.CharField(max_length=100, help_text="e.g., WhatsApp, Email, Web Form")
     raw_data = models.TextField(help_text="The raw query text")
     received_at = models.DateTimeField(auto_now_add=True)
     is_converted = models.BooleanField(default=False)
     trip = models.ForeignKey('Trip', on_delete=models.SET_NULL, null=True, blank=True, related_name='raw_leads')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='NEW')
 
     def __str__(self):
         return f"Lead from {self.source} at {self.received_at}"

@@ -7,7 +7,7 @@ const api = axios.create({
   },
 });
 
-export const getTrips = () => api.get('trips/');
+export const getTrips = (params?: any) => api.get('trips/', { params });
 export const getTripById = (id: string) => api.get(`trips/${id}/`);
 export const getQuotes = () => api.get('quotes/');
 export const getQuoteVariants = () => api.get('quote-variants/');
@@ -25,6 +25,10 @@ export const assignAgent = (tripId: number, agentId: number) =>
 
 export const archiveTrip = (tripId: number) => 
   api.patch(`trips/${tripId}/archive/`, {});
+
+export const getRawLeads = (params?: any) => api.get('raw-leads/', { params });
+export const markLeadSeen = (leadId: number) => api.patch(`raw-leads/${leadId}/mark_seen/`, {});
+
 
 export interface LeadConversionData {
   query_source?: string;
@@ -44,6 +48,6 @@ export interface LeadConversionData {
 }
 
 export const convertLead = (leadId: number, data: LeadConversionData) =>
-  api.post(`leads/${leadId}/convert/`, data);
+  api.post(`raw-leads/${leadId}/convert/`, data);
 
 export default api;
