@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function AccountingPlaceholder() {
   return (
     <div style={{ padding: '20px' }}>
@@ -5,7 +7,7 @@ export default function AccountingPlaceholder() {
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--text-main)' }}>Accounting</h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>This page is currently under construction. Please check back later!</p>
         <div style={{ fontSize: '48px', marginBottom: '24px' }}>💼</div>
-        <a href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Back to Home</a>
+        <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Back to Home</Link>
       </div>
     </div>
   );

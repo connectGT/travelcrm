@@ -900,6 +900,16 @@ body {
   margin-top: 8px;
 }
 
+.nav-dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: transparent;
+}
+
 .nav-dropdown:hover .nav-dropdown-menu {
   display: block;
 }
